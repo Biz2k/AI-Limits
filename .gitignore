@@ -1,0 +1,24 @@
+# ключи и данные пользователя — никогда не в git
+local_keys.py
+accounts.json
+cache.json
+gui.json
+.credentials.json
+ide_backups/
+*.log
+.env
+
+# сборка и временные файлы
+__pycache__/
+*.pyc
+build/
+dist/
+build_out/
+*.spec
+*.exe
+*.tmp
+
+# локальные настройки инструментов
+.claude/
+keys.dat
+history.csv
