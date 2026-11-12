@@ -1,0 +1,2 @@
+# файлы хранятся как есть: build_exe.cmd — в CP866 с CRLF, остальное — UTF-8 с CRLF
+* -text
