@@ -149,10 +149,6 @@ This is not an official mechanism. It may stop working after an IDE update, and 
 - It reads and writes credentials of the Antigravity IDE on your machine.
 - No warranty of any kind; see the license.
 
-## Roadmap
-
-See [ROADMAP.md](ROADMAP.md) (in Russian).
-
 ## License
 
 [MIT](LICENSE)
