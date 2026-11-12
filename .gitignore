@@ -22,3 +22,6 @@ build_out/
 .claude/
 keys.dat
 history.csv
+# рабочие заметки — только локально
+CLAUDE.md
+ROADMAP.md
