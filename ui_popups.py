@@ -176,6 +176,8 @@ class PopupsMixin:
             fn()
 
         accs = L.load_accounts()
+        pos = {e: i for i, e in enumerate(self.ordered([a["email"] for a in accs]))}
+        accs.sort(key=lambda a: pos[a["email"]])  # как карточки в окне
         item(T("Добавить Google-аккаунт"), lambda: run(self.add_account))
         item(T("Убрать Google-аккаунт"), lambda: self._show_menu(not show_remove), enabled=bool(accs),
              mark="▾" if show_remove else "▸")
@@ -221,6 +223,8 @@ class PopupsMixin:
         item(T("Автозапуск после старта системы"), toggle_autostart, enabled=os.name == "nt",
              check=autostart_enabled())
         item(T("Предупреждения по прогнозу"), toggle_forecast_alerts, check=bool(self.s.get("forecast_alerts")))
+        item(T("Карточки в две колонки"), lambda: (self.toggle_two_columns(), self._show_menu(show_remove)),
+             check=bool(self.s.get("two_columns")))
         chips(T("Автообновление"), [(T(n), s) for n, s in INTERVALS], self.interval, self.set_interval)
         chips(T("Порог предупреждения"), [(f"{v}%", v) for v in (70, 80, 90, 95)] + [(T("выкл"), 0)], int(self.warn),
               lambda v: self.set_warn(v))
