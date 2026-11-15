@@ -94,6 +94,27 @@ TEXTS = {
                                             "Не вдалося змінити акаунт: {error}"),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
     "макс.": ("max", "макс."),
+    'Войдите в аккаунт Claude в открывшемся браузере…':
+        ('Sign in to your Claude account in the browser that opened…',
+         'Увійдіть в акаунт Claude у браузері, що відкрився…'),
+    'Войдите в аккаунт ChatGPT в открывшемся браузере…':
+        ('Sign in to your ChatGPT account in the browser that opened…',
+         'Увійдіть в акаунт ChatGPT у браузері, що відкрився…'),
+    'Вход отменён':
+        ('Sign-in cancelled',
+         'Вхід скасовано'),
+    'Отменить':
+        ('Cancel',
+         'Скасувати'),
+    'отменено':
+        ('cancelled',
+         'скасовано'),
+    'время ожидания вышло':
+        ('timed out',
+         'час очікування минув'),
+    'программа входа завершилась без входа':
+        ('the sign-in program exited without signing in',
+         'програма входу завершилася без входу'),
     'IDE Antigravity запущена, но вход не выполнен':
         ('The Antigravity IDE is running but not signed in',
          'IDE Antigravity запущено, але вхід не виконано'),
@@ -109,12 +130,6 @@ TEXTS = {
     'Вернуть его можно через «Добавить аккаунт».':
         ('You can add it back with “Add account”.',
          'Повернути його можна через «Додати акаунт».'),
-    'Войдите в окне Claude Code — откроется браузер…':
-        ('Sign in in the Claude Code window — a browser will open…',
-         'Увійдіть у вікні Claude Code — відкриється браузер…'),
-    'Войдите в окне Codex — откроется браузер…':
-        ('Sign in in the Codex window — a browser will open…',
-         'Увійдіть у вікні Codex — відкриється браузер…'),
     'Вход не выполнен':
         ('Not signed in',
          'Вхід не виконано'),
