@@ -13,7 +13,7 @@ import accounts as A
 import history as H
 import limits as L
 from i18n import T
-from ui_theme import CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED
+from ui_theme import BLUE, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED
 
 ACCENT = {"claude": CLAUDE, "chatgpt": CODEX, "google": GOOGLE}
 GROUP = {"claude": "Claude", "chatgpt": "ChatGPT", "google": "Google"}
@@ -370,7 +370,7 @@ class AccountsMixin:
         var = tk.StringVar(value=current)
         ent = tk.Entry(parent, textvariable=var, bg=CARD_HI, fg=FG, insertbackground=FG, relief="flat",
                        font=font or label.cget("font"), highlightthickness=1, highlightbackground=LINE,
-                       highlightcolor=GOOGLE)
+                       highlightcolor=BLUE)
         info = label.grid_info() if label.winfo_manager() == "grid" else None
         if info:
             ent.grid(row=info["row"], column=info["column"], sticky="w", padx=info.get("padx", 0))

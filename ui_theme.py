@@ -18,7 +18,8 @@ GREEN = "#3ecf8e"
 YELLOW = "#f2c94c"
 RED = "#ff5c5c"
 CLAUDE = "#d97757"
-GOOGLE = "#5b8def"
+GOOGLE = "#6d6af2"  # индиго (1.5.1, выбор владельца): синий сливался с бирюзовым Codex
+BLUE = "#5b8def"    # общий цвет окна: кнопка «Да», галочки, выбранный вариант, линия графика, иконка
 CODEX = "#22b8cf"   # бирюзовый: зелёный сливался с полосами и процентами (выбор владельца, 1.5.0)
 FONT = "Segoe UI Variable Text" if os.name == "nt" else "Helvetica"
 FONT_D = "Segoe UI Variable Display" if os.name == "nt" else "Helvetica"

@@ -17,7 +17,7 @@ import limits as L  # noqa: E402
 import i18n  # noqa: E402
 from i18n import T  # noqa: E402
 from ui_theme import (
-    BG, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
+    BG, BLUE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
     color_for)
 from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
@@ -384,7 +384,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         specs = []  # (ключ, заголовок, цвет, описание)
         ide_running = getattr(self, "ide_running", False)  # IDE запущена (даже без входа)
         if not tiles:
-            specs.append(("\0none", "AI Limits", GOOGLE, spec(
+            specs.append(("\0none", "AI Limits", BLUE, spec(
                 msg=(T("Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить аккаунт»."), MUTED, (FONT, 10), (8, 0)))))
         for key, t in tiles:
             title, accent, res = t["title"], ACCENT[t["kind"]], t["res"]
@@ -435,11 +435,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             s["title"] = title
             self.cards[k].update(s, self.warn)
 
-        google = [(t["title"], t["res"]) for _, t in tiles if t["kind"] == "google"]
-        best = L.best_weekly(google)  # по остатку недельного лимита Gemini
-        footer_on = bool(best and len(google) > 1)
+        every = [(t["title"], t["res"]) for _, t in tiles]
+        best = L.best_weekly(every)  # наибольший остаток недельного лимита среди всех аккаунтов всех сервисов (1.5.1)
+        footer_on = bool(best and len(every) > 1)
         if footer_on:
-            _set(self.footer_email, text=best[0])
+            kind = next(t["kind"] for _, t in tiles if t["title"] == best[0])
+            _set(self.footer_email, text=best[0], fg=ACCENT[kind])  # имя — цветом сервиса
             _set(self.footer_pct, text=f"{best[1]:.0f}%")
         self._footer_on = footer_on
         self._sync_footer()

@@ -10,7 +10,7 @@ import limits as L
 from i18n import T
 from ui_theme import fade_in
 from ui_theme import (
-    CARD, CARD_HI, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, INTERVALS, LINE, MUTED, RED, YELLOW,
+    CARD, CARD_HI, FAINT, FG, FONT, FONT_D, FlatButton, BLUE, GREEN, INTERVALS, LINE, MUTED, RED, YELLOW,
     color_for)
 from autostart import autostart_enabled, set_autostart
 
@@ -72,7 +72,7 @@ class PopupsMixin:
             self.close_confirm()
             on_yes()
         FlatButton(btns, T("Нет"), self.close_confirm).pack(side="right")
-        FlatButton(btns, T("Да"), yes, bg=GOOGLE, fg="white", hover="#7aa2f5").pack(side="right", padx=(0, 8))
+        FlatButton(btns, T("Да"), yes, bg=BLUE, fg="white", hover="#7aa2f5").pack(side="right", padx=(0, 8))
 
         # под кнопкой, правым краем по её правому краю; не помещается — над ней; всегда в пределах монитора
         p.update_idletasks()
@@ -140,8 +140,8 @@ class PopupsMixin:
                 cb.pack(side="left")
                 x0 = (mark_w - sz) // 2
                 on_ = check and enabled
-                cb.create_rectangle(x0, 1, x0 + sz, 1 + sz, outline=GOOGLE if on_ else (MUTED if enabled else FAINT),
-                                    fill=GOOGLE if on_ else CARD_HI)
+                cb.create_rectangle(x0, 1, x0 + sz, 1 + sz, outline=BLUE if on_ else (MUTED if enabled else FAINT),
+                                    fill=BLUE if on_ else CARD_HI)
                 if check:
                     cb.create_line(x0 + sz * .22, 1 + sz * .52, x0 + sz * .42, 1 + sz * .72,
                                    x0 + sz * .78, 1 + sz * .28, fill="white" if enabled else FAINT,
@@ -169,7 +169,7 @@ class PopupsMixin:
             row.pack(fill="x", padx=(28, 8), pady=(0, 4))
             for label, val in options:
                 sel = val == current
-                ch = tk.Label(row, text=label, bg=GOOGLE if sel else CARD_HI,
+                ch = tk.Label(row, text=label, bg=BLUE if sel else CARD_HI,
                               fg="white" if sel else MUTED, font=(FONT, 9, "bold" if sel else "normal"),
                               padx=9, pady=3, cursor="hand2")
                 ch.pack(side="left", padx=(0, 4))

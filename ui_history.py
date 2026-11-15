@@ -7,7 +7,7 @@ import history as H
 import limits as L
 from i18n import T, day
 from ui_theme import fade_in
-from ui_theme import CARD, CARD_HI, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, YELLOW, color_for
+from ui_theme import CARD, CARD_HI, FAINT, FG, FONT, BLUE, GREEN, LINE, MUTED, YELLOW, color_for
 
 
 class HistoryMixin:
@@ -106,7 +106,7 @@ class HistoryMixin:
             t += step
         width = max(2, round(2 * k))
         for thin, run in H.graph_path(pts):  # сбросы и нули — линией вдвое тоньше
-            cv.create_line([c for ts, used in run for c in (x(max(ts, now - span)), y(used))], fill=GOOGLE,
+            cv.create_line([c for ts, used in run for c in (x(max(ts, now - span)), y(used))], fill=BLUE,
                            width=width / 2 if thin else width, joinstyle="round")
         if pts:
             ts, used, _ = pts[-1]
