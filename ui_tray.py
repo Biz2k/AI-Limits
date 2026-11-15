@@ -9,6 +9,7 @@ import tkinter as tk
 
 import limits as L
 from i18n import T
+from ui_theme import fade_in
 from ui_theme import (
     Bar, CARD, CARD_HI, CLAUDE, FAINT, FG, FONT, FONT_D, GOOGLE, GREEN, LINE, MUTED, RED, YELLOW,
     color_for)
@@ -16,7 +17,7 @@ from ui_theme import (
 GUI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "limits_gui.pyw")  # главный файл окна
 
 
-HOVER_DELAY_MS = 1000  # мини-окно появляется, если мышь задержалась на иконке трея на секунду
+HOVER_DELAY_MS = 500  # мини-окно появляется, если мышь задержалась на иконке трея на полсекунды
 FOCUS_GRACE = 0.6  # с: окно было в фокусе до щелчка по иконке трея (щелчок сам забирает фокус)
 
 
@@ -225,7 +226,7 @@ class TrayMixin:
     def _hover_show(self):
         self._hover_job = None
         if not getattr(self, "tray_menu", None):  # меню иконки открыто — мини-окно не показываем
-            self.show_popup()
+            self.show_popup(fade=True)
 
     @staticmethod
     def app_has_focus():
@@ -308,7 +309,8 @@ class TrayMixin:
             self.popup.destroy()
             self.popup = None
 
-    def show_popup(self):
+    def show_popup(self, fade=False):
+        """Мини-окно над иконкой трея; fade — плавно проявить (при наведении мыши)."""
         self.hide_popup()
         if not self.data or self.root.state() == "withdrawn" and False:
             return
@@ -327,6 +329,8 @@ class TrayMixin:
         rows = [rows[k] for k in self.ordered(list(rows))]
 
         p = tk.Toplevel(self.root)
+        if fade:
+            fade_in(p)
         p.overrideredirect(True)
         p.attributes("-topmost", True)
         p.configure(bg=LINE)

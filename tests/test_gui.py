@@ -157,6 +157,8 @@ def main():
     yield wait()
     win = app.confirm_win
     assert win is not None and any("раньше сброса" in t for t in texts(win))
+    yield wait(0.3)
+    assert float(win.attributes("-alpha")) > 0.99                       # график проявился плавно и до конца
     assert any(isinstance(c, tk.Canvas) and c.find_all() for c in win.winfo_children()[0].winfo_children())
     win.event_generate("<Escape>")
     yield wait()
@@ -188,7 +190,8 @@ def main():
     step("обновление на месте: карточки и число виджетов прежние, значение новое")
 
     app.open_menu()
-    yield wait()
+    yield wait(0.5)
+    assert float(app.menu_win.attributes("-alpha")) > 0.99            # проявилось до конца
     items = texts(app.menu_win)
     for need in ("Добавить Google-аккаунт", "Сворачивать в трей при закрытии", "Предупреждения по прогнозу", "Язык", "English", "Українська",
                  "Открыть папку данных", f"AI Limits {L.__version__}"):
@@ -259,18 +262,21 @@ def main():
 
     if app.tray:
         app.q.put("hover_on")
-        yield wait(0.6)
-        assert getattr(app, "popup", None) is None, "мини-окно появилось раньше секунды"
-        yield wait(1, lambda: getattr(app, "popup", None) is not None, "мини-окно не появилось через секунду")
+        yield wait(0.25)
+        assert getattr(app, "popup", None) is None, "мини-окно появилось раньше полсекунды"
+        yield wait(1, lambda: getattr(app, "popup", None) is not None, "мини-окно не появилось через полсекунды")
+        a0 = float(app.popup.attributes("-alpha"))
+        yield wait(0.4)
+        assert a0 < 1 and float(app.popup.attributes("-alpha")) > 0.99, (a0, app.popup.attributes("-alpha"))
         app.q.put("hover_off")
         yield wait(0.3)
         assert app.popup is None
         app.q.put("hover_on")
-        yield wait(0.4)
-        app.q.put("hover_off")                                         # мышь ушла раньше секунды
+        yield wait(0.2)
+        app.q.put("hover_off")                                         # мышь ушла раньше полсекунды
         yield wait(1)
         assert app.popup is None, "мини-окно появилось, хотя мышь ушла"
-        step("мини-окно трея появляется через секунду наведения, если мышь не ушла раньше")
+        step("мини-окно трея: через полсекунды наведения, плавно проявляется; мышь ушла раньше — не появляется")
 
     app.show_tray_menu(400, 400)
     yield wait()

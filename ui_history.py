@@ -6,6 +6,7 @@ import tkinter as tk
 import history as H
 import limits as L
 from i18n import T, day
+from ui_theme import fade_in
 from ui_theme import CARD, CARD_HI, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, YELLOW, color_for
 
 
@@ -65,6 +66,7 @@ class HistoryMixin:
         fc = getattr(self, "fc", {}).get((key.lower(), window))
 
         p = tk.Toplevel(self.root)
+        fade_in(p)
         p.overrideredirect(True)
         p.attributes("-topmost", True)
         p.configure(bg=LINE)

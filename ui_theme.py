@@ -58,6 +58,30 @@ def local_time(iso):
 
 
 # ---------------------------------------------------------------- виджеты
+FADE_IN_MS = 250  # плавное появление всплывающих окон — как у предупреждения о пороге
+
+
+def fade_in(win, ms=FADE_IN_MS, alpha=1.0):
+    """Плавное появление окна win. Вызывать сразу после создания Toplevel: окно становится прозрачным
+    до первой отрисовки, а проявляться начинает, когда построено и размещено."""
+    try:
+        win.attributes("-alpha", 0.0)
+    except tk.TclError:
+        return
+    steps = max(1, ms // 16)
+
+    def tick(i):
+        try:
+            if not win.winfo_exists():
+                return
+            win.attributes("-alpha", alpha * i / steps)
+        except tk.TclError:  # окно уже закрыто
+            return
+        if i < steps:
+            win.after(16, tick, i + 1)
+    win.after(0, tick, 1)
+
+
 class Tooltip:
     def __init__(self, w, text):
         self.w, self.text, self.tip = w, text, None
