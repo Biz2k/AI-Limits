@@ -8,6 +8,7 @@ from tkinter import font as tkfont
 import i18n
 import limits as L
 from i18n import T
+from ui_theme import fade_in
 from ui_theme import (
     CARD, CARD_HI, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, INTERVALS, LINE, MUTED, RED, YELLOW,
     color_for)
@@ -109,12 +110,15 @@ class PopupsMixin:
         if getattr(self, "menu_win", None):
             self.close_menu()
         else:
-            self._show_menu(False)
+            self._show_menu(False, fade=True)
 
-    def _show_menu(self, show_remove):
-        """Своё тёмное меню настроек: отметки и выбор видны на тёмном фоне."""
+    def _show_menu(self, show_remove, fade=False):
+        """Своё тёмное меню настроек: отметки и выбор видны на тёмном фоне. fade — плавно проявить (открытие
+        кнопкой ⚙; при перерисовке после щелчка по пункту меню не мигает)."""
         self.close_menu()
         p = tk.Toplevel(self.root)
+        if fade:
+            fade_in(p)
         p.overrideredirect(True)
         p.attributes("-topmost", True)
         p.configure(bg=LINE)
