@@ -276,19 +276,18 @@ class TrayMixin:
         if not self.data or self.root.state() == "withdrawn" and False:
             return
         claude, ag = self.data
-        rows = []
+        rows = {}  # ключ карточки -> строка; порядок — как у карточек в окне
         if isinstance(claude, dict):
             d = {r["name"]: r["used"] for r in claude["limits"]}
-            rows.append(("Claude Code", CLAUDE, d.get("Неделя"), d.get("5 часов"), None))
+            rows["claude"] = ("Claude Code", CLAUDE, d.get("Неделя"), d.get("5 часов"), None)
         for email, r in ag:
             if not isinstance(r, dict):
-                rows.append((email.split("@")[0], GOOGLE, None, None,
-                             "загрузка" if r is None else "ошибка"))
+                rows[email] = (email.split("@")[0], GOOGLE, None, None, "загрузка" if r is None else "ошибка")
                 continue
             d = {m["name"]: m["used"] for m in r["models"]}
             ide = r.get("source") == "данные IDE Antigravity"
-            rows.append((email.split("@")[0], GOOGLE, d.get("Неделя"), d.get("5 часов"),
-                         "IDE" if ide else None))
+            rows[email] = (email.split("@")[0], GOOGLE, d.get("Неделя"), d.get("5 часов"), "IDE" if ide else None)
+        rows = [rows[k] for k in self.ordered(list(rows))]
 
         p = tk.Toplevel(self.root)
         p.overrideredirect(True)
@@ -349,20 +348,20 @@ class TrayMixin:
 
         def fmt(v):
             return "—" if v is None else f"{v:.0f}%"
-        lines = []
+        lines = {}  # ключ карточки -> строка подсказки; порядок — как у карточек в окне
         if isinstance(claude, dict):
             d = {r["name"]: r["used"] for r in claude["limits"]}
-            lines.append(T("{name}  нед {week} · 5ч {five}", name="Claude",
+            lines["claude"] = (T("{name}  нед {week} · 5ч {five}", name="Claude",
                            week=fmt(d.get("Неделя")), five=fmt(d.get("5 часов"))))
         for email, r in ag:
             name = email.split("@")[0][:11]
             if not isinstance(r, dict):
-                lines.append(f"{name}  {T('загрузка…') if r is None else T('ошибка')}")
+                lines[email] = f"{name}  {T('загрузка…') if r is None else T('ошибка')}"
                 continue
             d = {m["name"]: m["used"] for m in r["models"]}
-            lines.append(T("{name}  нед {week} · 5ч {five}", name=name, week=fmt(d.get("Неделя")),
-                           five=fmt(d.get("5 часов"))))
-        tip = "\n".join(lines)
+            lines[email] = T("{name}  нед {week} · 5ч {five}", name=name, week=fmt(d.get("Неделя")),
+                             five=fmt(d.get("5 часов")))
+        tip = "\n".join(lines[k] for k in self.ordered(list(lines)))
         if len(tip) > 127:
             tip = tip[:126] + "…"
         self.tray.set_tip(tip or "AI Limits")

@@ -142,6 +142,7 @@ TEXTS = {
     "хватит на {span}, до {when}": ("lasts {span}, until {when}", "вистачить на {span}, до {when}"),
     "до {when}": ("until {when}", "до {when}"),
     "Предупреждения по прогнозу": ("Forecast warnings", "Попередження за прогнозом"),
+    "Карточки в две колонки": ("Cards in two columns", "Картки у дві колонки"),
     "Расход за 7 дней": ("Usage over 7 days", "Витрата за 7 днів"),
     "Расход за сутки": ("Usage over 24 hours", "Витрата за добу"),
     "Истории пока нет — она копится при каждом обновлении": ("No history yet — it builds up with every refresh",

@@ -93,8 +93,8 @@ class CardView:
         self._content_on = False
         self._msg_pady = None
         self.outer = tk.Frame(app.body, bg=BG)
-        f = tk.Frame(self.outer, bg=CARD, highlightbackground=LINE, highlightthickness=1)
-        f.pack(fill="x")
+        self.frame = f = tk.Frame(self.outer, bg=CARD, highlightbackground=LINE, highlightthickness=1)
+        f.pack(fill="both", expand=True)  # в две колонки карточки одной строки — одной высоты
         tk.Frame(f, bg=accent, width=3).pack(side="left", fill="y")
         inner = tk.Frame(f, bg=CARD)
         inner.pack(side="left", fill="both", expand=True, padx=16, pady=14)
@@ -105,8 +105,6 @@ class CardView:
         self.arrow.grid(row=0, column=0, padx=(0, 6))
         self.title = tk.Label(h, text=title, bg=CARD, fg=FG, font=(FONT, 12, "bold"))
         self.title.grid(row=0, column=1)
-        for w in (self.arrow, self.title):
-            w.bind("<Button-1>", lambda e: self.collapsible and app.toggle(key))
         self.badge = tk.Label(h, bg=CARD_HI, fg=accent, font=(FONT, 8, "bold"), padx=7, pady=1)
         self.badge.grid(row=0, column=2, padx=8)
         self.summary = tk.Label(h, bg=CARD, font=(FONT, 10, "bold"))
@@ -117,6 +115,9 @@ class CardView:
         self.ide.bind("<Enter>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=FG))
         self.ide.bind("<Leave>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=MUTED))
         self.ide_tip = Tooltip(self.ide, "")
+        # заголовок — ручка перетаскивания; щелчок по стрелке или названию сворачивает карточку
+        app.bind_drag(self, (self.arrow, self.title), click=lambda: self.collapsible and app.toggle(key))
+        app.bind_drag(self, (inner, h, self.badge, self.summary))
         self.content = tk.Frame(inner, bg=CARD)
         self.msg = tk.Label(self.content, bg=CARD, anchor="w", justify="left", wraplength=380)
         self.rows_box = tk.Frame(self.content, bg=CARD)

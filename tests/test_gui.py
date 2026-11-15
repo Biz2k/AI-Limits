@@ -8,6 +8,7 @@ import sys
 import time
 import tkinter as tk
 import traceback
+import types
 from importlib.machinery import SourceFileLoader
 
 SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -250,7 +251,62 @@ def main():
     assert app.tray_menu is None
     step("меню иконки в трее")
 
-    app.toggle("claude")
+    E = types.SimpleNamespace  # событие мыши: нужны только координаты экрана
+    cl, ca, cb = (app.cards[k] for k in ("claude", "a@example.com", "b@example.com"))
+    tx, ty = cl.outer.winfo_rootx() + 30, cl.outer.winfo_rooty() + 5
+    bx, by = cb.title.winfo_rootx() + 5, cb.title.winfo_rooty() + 5
+    app._drag_press(E(x_root=bx, y_root=by), cb, None)
+    app._drag_motion(E(x_root=bx, y_root=by - 3))                       # меньше порога — ещё щелчок
+    assert not app._drag["on"] and app.card_order == ["claude", "a@example.com", "b@example.com"]
+    app._drag_motion(E(x_root=tx, y_root=ty))
+    assert app.card_order == ["b@example.com", "claude", "a@example.com"], app.card_order
+    app._drag_release(E(x_root=tx, y_root=ty))
+    yield wait()
+    assert SAVED[-1]["order"] == ["b@example.com", "claude", "a@example.com"]
+    assert [int(app.cards[k].outer.grid_info()["row"]) for k in app.card_order] == [0, 1, 2]
+    app.show_popup()
+    yield wait()
+    t = texts(app.popup)
+    assert t.index("b") < t.index("Claude Code") < t.index("a"), t       # мини-окно трея — в том же порядке
+    app.hide_popup()
+    app._show_menu(True)
+    yield wait()
+    t = [x.strip() for x in texts(app.menu_win)]
+    assert t.index("✕  b@example.com") < t.index("✕  a@example.com"), t  # список «Убрать» — тоже
+    app.close_menu()
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert app.card_order == ["b@example.com", "claude", "a@example.com"]
+    step("перетаскивание карточки за заголовок: порядок сохраняется, его повторяют мини-окно трея и меню")
+
+    w0 = root.winfo_width()
+    app.toggle_two_columns()
+    yield wait(0.5)
+    assert SAVED[-1]["two_columns"] and root.winfo_width() > w0 * 1.5, (w0, root.winfo_width())
+    pos = {k: (int(app.cards[k].outer.grid_info()["row"]), int(app.cards[k].outer.grid_info()["column"]))
+           for k in app.card_order}
+    assert pos == {"b@example.com": (0, 0), "claude": (0, 1), "a@example.com": (1, 0)}, pos
+    assert cb.outer.winfo_height() == cl.outer.winfo_height()           # карточки одной строки — одной высоты
+    assert cb.outer.winfo_rootx() < cl.outer.winfo_rootx()
+    ax, ay = ca.title.winfo_rootx() + 5, ca.title.winfo_rooty() + 5
+    app._drag_press(E(x_root=ax, y_root=ay), ca, None)
+    app._drag_motion(E(x_root=cb.outer.winfo_rootx() + 10, y_root=cb.outer.winfo_rooty() + 10))
+    app._drag_release(E(x_root=0, y_root=0))
+    assert app.card_order == ["a@example.com", "b@example.com", "claude"], app.card_order
+    yield wait()
+    assert int(cl.outer.grid_info()["row"]) == 1
+    app.toggle_two_columns()
+    yield wait(0.5)
+    assert not SAVED[-1]["two_columns"] and abs(root.winfo_width() - w0) < 4, (w0, root.winfo_width())
+    assert {int(app.cards[k].outer.grid_info()["column"]) for k in app.card_order} == {0}
+    app.s["order"] = []
+    app.render(*app.data)
+    yield wait()
+    assert app.card_order == ["claude", "a@example.com", "b@example.com"]
+    step("две колонки: окно расширяется, перетаскивание по сетке, возврат в одну колонку")
+
+    cl.title.event_generate("<ButtonPress-1>")
+    cl.title.event_generate("<ButtonRelease-1>")
     yield wait()
     assert "claude" in app.collapsed and SAVED and "claude" in SAVED[-1]["collapsed"]
     cmd = autostart.autostart_command()

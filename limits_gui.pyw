@@ -23,6 +23,7 @@ from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
 from ui_tray import TrayMixin  # noqa: E402
 from ui_history import HistoryMixin  # noqa: E402
+from ui_layout import LayoutMixin  # noqa: E402
 
 # ---------------------------------------------------------------- DPI / тема
 if os.name == "nt":
@@ -54,7 +55,7 @@ def save_settings(s):
 
 
 # ---------------------------------------------------------------- приложение
-class App(PopupsMixin, TrayMixin, HistoryMixin):
+class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
     def __init__(self, root, autostart=False):
         self.root = root
         self.s = load_settings()
@@ -132,12 +133,13 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
         except Exception:
             pass
 
-    def fit_height(self):
+    def fit_height(self, width=None):
+        """Высота окна по содержимому; width — заодно новая ширина (смена числа колонок)."""
         self.root.update_idletasks()
         need = (self.cv.winfo_rooty() - self.root.winfo_rooty()) + self.body.winfo_reqheight() + 14
         need = min(need, self.root.winfo_screenheight() - 120)
         x, y = self.root.winfo_x(), self.root.winfo_y()
-        self.root.geometry(f"{self.root.winfo_width()}x{need}+{x}+{y}")
+        self.root.geometry(f"{width or self.root.winfo_width()}x{need}+{x}+{y}")
 
     def _on_body(self, _):
         self.cv.configure(scrollregion=self.cv.bbox("all"))
@@ -373,7 +375,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
     # ------------------------------------------------ отрисовка
     def render_placeholder(self, text):
         self._placeholder = tk.Label(self.body, text=text, bg=BG, fg=MUTED, font=(FONT, 11))
-        self._placeholder.pack(pady=40)
+        self._placeholder.grid(row=0, column=0, columnspan=2, pady=40)
+        self.body.columnconfigure(0, weight=1)
 
     def toggle(self, key):
         self.collapsed ^= {key}
@@ -457,20 +460,14 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
             self.footer_pct = tk.Label(self.footer, bg=BG, fg=GREEN, font=(FONT, 10, "bold"))
             self.footer_pct.pack(side="left", padx=(0, 6))
 
-        keys = [s[0] for s in specs]
-        if keys != self.card_order:  # добавили/убрали аккаунт — меняем набор карточек
+        keys = self.ordered([s[0] for s in specs])  # порядок — как пользователь расставил перетаскиванием
+        relayout = keys != self.card_order
+        if relayout:  # добавили/убрали аккаунт — меняем набор карточек
             for k in set(self.cards) - set(keys):
                 self.cards.pop(k).outer.destroy()
             for k, title, accent, _ in specs:
                 if k not in self.cards:
                     self.cards[k] = CardView(self, k, title, accent)
-            for k in self.card_order:
-                if k in self.cards:
-                    self.cards[k].outer.pack_forget()
-            self.footer.pack_forget()
-            self._footer_on = False
-            for k in keys:
-                self.cards[k].outer.pack(fill="x", padx=20, pady=6)
             self.card_order = keys
         for k, _, _, s in specs:
             self.cards[k].update(s, self.warn)
@@ -482,10 +479,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
             _set(self.footer_pct, text=f"{best[1]:.0f}%")
         if footer_on != self._footer_on:
             self._footer_on = footer_on
-            if footer_on:
-                self.footer.pack(fill="x", padx=22, pady=(8, 4))
-            else:
-                self.footer.pack_forget()
+            relayout = True
+        if relayout:
+            self.layout_cards()
 
         self.set_status_updated()
 
