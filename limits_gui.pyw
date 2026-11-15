@@ -17,7 +17,7 @@ import limits as L  # noqa: E402
 import i18n  # noqa: E402
 from i18n import T  # noqa: E402
 from ui_theme import (
-    BG, CLAUDE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
+    BG, CLAUDE, CODEX, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
     color_for)
 from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
@@ -210,8 +210,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.ag_res = {e: prev.get(e) for e in order}          # старые значения остаются видны
         if not hasattr(self, "claude_res"):
             self.claude_res = None
+        if not hasattr(self, "codex_res"):
+            self.codex_res = None
+        codex = L.codex_installed()  # нет входа Codex — нет и карточки
         self.local_emails = set()
-        self.pending = {"claude", "local", *[("ag", e) for e in order]}
+        self.pending = {"claude", "local", *[("ag", e) for e in order], *(["codex"] if codex else [])}
         self.redraw()
 
         def run(key, fn, *args):
@@ -222,6 +225,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             self.root.after(0, self._on_part, key, val)
 
         threading.Thread(target=run, args=("claude", L.claude_fetch), daemon=True).start()
+        if codex:
+            threading.Thread(target=run, args=("codex", L.codex_fetch), daemon=True).start()
         threading.Thread(target=run, args=("local", L.local_ide_info), daemon=True).start()
         for a in accs:
             threading.Thread(target=run, args=(("ag", a["email"]), L.ag_fetch, a, False, None),
@@ -236,6 +241,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.pending.discard(key)
         if key == "claude":
             self.claude_res = val
+        elif key == "codex":
+            self.codex_res = val
         elif key == "local":
             val = val if isinstance(val, dict) else {}
             self.ide_running = bool(val.get("running"))
@@ -254,7 +261,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             if email not in self.local_emails:  # данные IDE точнее облачных
                 self.ag_res[email] = self._merge(email, val)
         shown = getattr(self, "data", None)  # что сейчас на экране
-        if not shown or shown[0] is None or any(r is None for _, r in shown[1]):
+        if not shown or shown[0] is None or any(r is None for _, r in shown[1]) or \
+                (shown[2] is None and "codex" in self.pending):
             self.redraw()  # есть карточки «Загрузка…» — заполняем их по мере прихода данных
         if not self.pending:
             self._all_done()
@@ -281,7 +289,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.schedule()
 
     def redraw(self):
-        self.data = (self.claude_res, [(e, self.ag_res.get(e)) for e in self.ag_order])
+        self.data = (self.claude_res, [(e, self.ag_res.get(e)) for e in self.ag_order],
+                     getattr(self, "codex_res", None) if L.codex_installed() else False)
         sig = repr((self.data, getattr(self, "ide_running", False),
                     sorted((k, fc["line"]) for k, fc in getattr(self, "fc", {}).items())))
         if sig == getattr(self, "_last_sig", None):  # ничего не изменилось — не перерисовываем
@@ -356,10 +365,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                      T("Вернуть его можно через «Добавить Google-аккаунт»."), go)
 
     # ------------------------------------------------ оповещения
-    def check_alerts(self, claude, ag):
+    def check_alerts(self, claude, ag, codex=None):
         hits = []
-        if isinstance(claude, dict):
-            hits += [("Claude · " + r["name"], r["used"]) for r in claude["limits"]]
+        for name, res in (("Claude", claude), ("Codex", codex)):
+            if isinstance(res, dict):
+                hits += [(name + " · " + r["name"], r["used"]) for r in res["limits"]]
         for email, r in ag:
             if isinstance(r, dict):
                 hits += [(f"{email} · {m['name']}", m["used"]) for m in r["models"] if m["used"] is not None]
@@ -387,7 +397,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         if self.data:
             self.render(*self.data)
 
-    def render(self, claude, ag):
+    def render(self, claude, ag, codex=None):
         """Приводит карточки в соответствие с данными. Карточки и строки создаются один раз и дальше
         обновляются на месте (значения, полосы, время, метка IDE); состав карточек меняется только
         при добавлении/удалении аккаунта."""
@@ -405,17 +415,22 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             return (str(e), RED, (FONT, 9), (8, 0))
 
         specs = []  # (ключ, заголовок, цвет, описание)
-        # Claude
-        if claude is None:
-            specs.append(("claude", "Claude Code", CLAUDE, spec(msg=loading)))
-        elif isinstance(claude, Exception):
-            specs.append(("claude", "Claude Code", CLAUDE, spec(msg=failed(claude))))
-        else:
-            folded = "claude" in self.collapsed
-            specs.append(("claude", "Claude Code", CLAUDE, spec(
-                collapsible=True, folded=folded, badge=claude["plan"],
-                summary=self.weekly_left(claude["limits"]) if folded else None,
-                rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None) for r in claude["limits"]])))
+        # Claude Code и Codex (codex is False — входа Codex нет, карточки нет)
+        for key, title, accent, res in (("claude", "Claude Code", CLAUDE, claude),
+                                        ("codex", "Codex", CODEX, codex)):
+            if res is False:
+                continue
+            if res is None:
+                specs.append((key, title, accent, spec(msg=loading)))
+            elif isinstance(res, Exception):
+                specs.append((key, title, accent, spec(msg=failed(res))))
+            else:
+                folded = key in self.collapsed
+                specs.append((key, title, accent, spec(
+                    collapsible=True, folded=folded, badge=res["plan"],
+                    summary=self.weekly_left(res["limits"]) if folded else None,
+                    msg=None if res["limits"] or folded else (T("Нет данных о лимитах"), MUTED, (FONT, 10), (8, 0)),
+                    rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None) for r in res["limits"]])))
 
         # Antigravity
         ide_running = getattr(self, "ide_running", False)  # IDE запущена (даже без входа)

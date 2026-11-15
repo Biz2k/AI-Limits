@@ -17,8 +17,9 @@ class HistoryMixin:
         """После полного обновления: дописать значения в историю и пересчитать прогнозы (self.fc)."""
         try:
             ag = [(e, self.ag_res.get(e)) for e in self.ag_order]
-            H.record(self.claude_res, ag)
-            self.fc = H.forecasts(self.claude_res, ag)
+            codex = getattr(self, "codex_res", None)
+            H.record(self.claude_res, ag, codex=codex)
+            self.fc = H.forecasts(self.claude_res, ag, codex=codex)
         except Exception as e:  # история — вспомогательная: её сбой не должен мешать показу лимитов
             self.fc = {}
             L.log_exception("история лимитов", type(e), e, e.__traceback__)
@@ -33,7 +34,7 @@ class HistoryMixin:
 
     @staticmethod
     def _who(key):
-        return "Claude" if key == "claude" else key.split("@")[0]
+        return {"claude": "Claude", "codex": "Codex"}.get(key) or key.split("@")[0]
 
     def forecast_alerts(self):
         """Всплывающие предупреждения по прогнозу: [(чей лимит, «чт 14:00»)]. Включаются галочкой в меню ⚙
@@ -75,7 +76,7 @@ class HistoryMixin:
         k = self.root.winfo_fpixels("1i") / 96  # масштаб экрана
         box = tk.Frame(p, bg=CARD, padx=16, pady=14)
         box.pack(padx=1, pady=1)
-        tk.Label(box, text=("Claude Code" if key == "claude" else key) + "  ·  " + T(window), bg=CARD, fg=FG,
+        tk.Label(box, text={"claude": "Claude Code", "codex": "Codex"}.get(key, key) + "  ·  " + T(window), bg=CARD, fg=FG,
                  font=(FONT, 11, "bold"), anchor="w").pack(fill="x")
         tk.Label(box, text=T("Расход за 7 дней") if week else T("Расход за сутки"), bg=CARD, fg=MUTED,
                  font=(FONT, 9), anchor="w").pack(fill="x", pady=(2, 8))

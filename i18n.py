@@ -100,6 +100,15 @@ TEXTS = {
          "Акаунтів немає. Додайте його в меню ⚙ → «Додати Google-акаунт»."),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
     "макс.": ("max", "макс."),
+    "Нет данных о лимитах": ("No limit data", "Немає даних про ліміти"),
+    "Codex не установлен или в него не входили": ("Codex is not installed or not signed in",
+                                                  "Codex не встановлено або в нього не входили"),
+    "Codex вошёл не через аккаунт ChatGPT — лимитов подписки нет":
+        ("Codex is not signed in with a ChatGPT account — there are no subscription limits",
+         "Codex увійшов не через акаунт ChatGPT — лімітів підписки немає"),
+    "вход Codex устарел — запустите Codex, он обновит его сам":
+        ("the Codex sign-in is out of date — start Codex, it will renew it",
+         "вхід Codex застарів — запустіть Codex, він оновить його сам"),
     "Обновлено {time}": ("Updated {time}", "Оновлено {time}"),
     # ---- время
     "1 мин": ("1 min", "1 хв"),

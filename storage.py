@@ -12,6 +12,9 @@ from version import __version__
 APPDIR = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~/.config"), "ai-limits")
 ACCOUNTS_FILE = os.path.join(APPDIR, "accounts.json")
 CLAUDE_CREDS = os.path.join(os.path.expanduser("~"), ".claude", ".credentials.json")
+# вход Codex (подписка ChatGPT): папка — переменная CODEX_HOME, иначе ~/.codex
+CODEX_AUTH = os.path.join(os.environ.get("CODEX_HOME") or os.path.join(os.path.expanduser("~"), ".codex"),
+                          "auth.json")
 ANTIGRAVITY_APPDATA = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~/.config"), "Antigravity")
 IDE_BACKUP_DIR = os.path.join(APPDIR, "ide_backups")
 APP_LOG = os.path.join(APPDIR, "app.log")  # необработанные ошибки

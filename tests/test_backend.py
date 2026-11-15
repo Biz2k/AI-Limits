@@ -347,16 +347,57 @@ def test_switch():
     step("смена аккаунта: успех, откат при «входа нет» и чужом аккаунте, без отката при молчании, отказ закрытия")
 
 
+# ------------------------------------------------------------------ Codex (подписка ChatGPT)
+def test_codex():
+    storage.CODEX_AUTH = os.path.join(storage.APPDIR, "codex_auth.json")
+    assert not cloud.codex_installed()
+    assert "не установлен" in expect_error(RuntimeError, cloud.codex_fetch)
+    with open(storage.CODEX_AUTH, "w", encoding="utf-8") as f:
+        json.dump({"auth_mode": "chatgpt", "tokens": {"access_token": "eyJfake-codex-access", "account_id": "acc-1",
+                                                      "refresh_token": "fake-codex-refresh"}}, f)
+    seen = {}
+
+    def fake_http(url, data=None, headers=None, **k):
+        seen.update(url=url, headers=headers)
+        return {"plan_type": "plus", "rate_limit": {
+            "primary_window": {"used_percent": 7, "limit_window_seconds": 18000, "reset_at": 1_800_000_000},
+            "secondary_window": {"used_percent": 31.5, "limit_window_seconds": 604800, "reset_at": 1_800_500_000}}}
+    real_http, cloud.http_json = cloud.http_json, fake_http
+    try:
+        assert cloud.codex_installed()
+        res = cloud.codex_fetch()
+        assert res["plan"] == "plus" and [(r["name"], r["used"]) for r in res["limits"]] == [("Неделя", 31.5), ("5 часов", 7.0)]
+        assert res["limits"][0]["resets_at"] == history._iso(1_800_500_000), res
+        assert seen["url"].endswith("/wham/usage") and seen["headers"]["Authorization"] == "Bearer eyJfake-codex-access"
+        assert seen["headers"]["ChatGPT-Account-Id"] == "acc-1"
+        with open(storage.CODEX_AUTH, encoding="utf-8") as f:
+            assert "fake-codex-refresh" in f.read()                # файл Codex только читаем, токен не обновляем
+
+        def expired(*a, **k):
+            raise RuntimeError("HTTP 401: {}")
+        cloud.http_json = expired
+        assert "запустите Codex" in expect_error(RuntimeError, cloud.codex_fetch)
+        with open(storage.CODEX_AUTH, "w", encoding="utf-8") as f:
+            json.dump({"auth_mode": "apikey", "OPENAI_API_KEY": "sk-fake"}, f)
+        assert "не через аккаунт ChatGPT" in expect_error(RuntimeError, cloud.codex_fetch)
+    finally:
+        cloud.http_json = real_http
+    step("Codex: лимиты недели и 5 часов из входа Codex, файл только читается, устаревший вход — понятная ошибка")
+
+
 # ------------------------------------------------------------------ вывод без токенов
 def test_no_tokens_in_output():
     cloud.load_accounts = lambda: [{"email": "a@example.com", "refresh_token": FAKE_R}]
     cloud.claude_fetch = lambda: {"plan": "pro", "limits": []}
+    cloud.codex_installed = lambda: True
+    cloud.codex_fetch = lambda: {"plan": "plus", "limits": [{"name": "Неделя", "used": 12.0, "resets_at": None}]}
     ide_local.local_ide_quota = lambda: {}
     cloud.ag_fetch = lambda acc, all_models=False, local=None: {"plan": "Pro", "models": [], "credits": None,
                                                                  "source": "облако"}
-    claude, ag = limits.collect(False)
-    out = json.dumps(limits.to_jsonable(claude, ag), ensure_ascii=False)
-    assert "a@example.com" in out
+    claude, ag, codex = limits.collect(False)
+    out = json.dumps(limits.to_jsonable(claude, ag, codex), ensure_ascii=False)
+    assert "a@example.com" in out and '"codex": {"plan": "plus"' in out, out
+    assert "Codex" in limits.render(claude, ag, 80, codex)
     assert not any(x in out for x in ("1//", "ya29.", "dpapi:", "refresh_token")), out
     ide_local._ide_log("проверка", {"access_token": FAKE_A + "x" * 80, "t": FAKE_R + "y" * 80})
     with open(ide_local.IDE_LOG, encoding="utf-8") as f:
@@ -503,6 +544,7 @@ def main():
     test_backup_restore(old_copy)
     test_restore_command()
     test_switch()
+    test_codex()
     test_no_tokens_in_output()
     test_history()
     test_translations()
