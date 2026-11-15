@@ -161,6 +161,13 @@ def main():
     win.event_generate("<Escape>")
     yield wait()
     assert app.confirm_win is None
+    row = app.cards["a@example.com"].rows[0].f
+    app.show_history("a@example.com", "Неделя", row)
+    yield wait()
+    assert app.confirm_win is not None
+    app.show_history("a@example.com", "Неделя", row)                   # повторный щелчок по той же строке
+    yield wait()
+    assert app.confirm_win is None, "график не закрылся повторным щелчком"
     app.show_history("b@example.com", "5 часов", app.cards["b@example.com"].rows[1].f)
     yield wait()
     assert any("Прогноза нет" in t for t in texts(app.confirm_win))
@@ -169,7 +176,7 @@ def main():
     yield wait()
     assert not any("хватит" in t for t in texts(app.popup)), texts(app.popup)
     app.hide_popup()
-    step("график расхода по щелчку на строке; в мини-окне трея прогноза нет")
+    step("график расхода по щелчку на строке, повторный щелчок закрывает; в мини-окне трея прогноза нет")
 
     cards, count = dict(app.cards), widgets(app.body)
     STATE["week_a"] = 61.0
@@ -352,9 +359,10 @@ def main():
     assert app.footer.master is app.status_row and app.footer.winfo_ismapped()
     assert app.footer.winfo_rootx() > app.status.winfo_rootx()          # «макс.» — справа в строке статуса
     labels = app.footer.winfo_children()
+    assert "→" not in [w.cget("text") for w in labels] and len(labels) == 3
     assert labels[0].cget("text") == "макс." and "bold" not in str(labels[1].cget("font"))
     assert "bold" in str(labels[-1].cget("font")) and labels[-1].cget("text").endswith("%")
-    step("строка статуса: «Обновлено ЧЧ:ММ» без автообновления, справа «макс. email → N%»")
+    step("строка статуса: «Обновлено ЧЧ:ММ» без автообновления, справа «макс. email N%» без стрелки")
 
     tip = cb.ide_tip                                                    # «Сделать этот аккаунт текущим в IDE…»
     tip.show(None)

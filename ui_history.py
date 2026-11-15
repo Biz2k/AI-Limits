@@ -51,7 +51,11 @@ class HistoryMixin:
 
     def show_history(self, key, window, anchor):
         """Окно с графиком расхода лимита (щелчок по строке лимита): 7 дней для недельного, сутки для 5-часового.
-        Закрывается по Esc и щелчку мимо — как окно подтверждения."""
+        Закрывается по Esc, щелчку мимо и повторному щелчку по той же строке — как окно подтверждения."""
+        cur = getattr(self, "confirm_win", None)
+        if cur is not None and getattr(cur, "chart", None) == (key, window):  # тот же график уже открыт — закрыть
+            self.close_confirm()
+            return
         self.close_confirm()
         self.close_menu()
         week = window.lower().startswith("нед")
@@ -65,6 +69,7 @@ class HistoryMixin:
         p.attributes("-topmost", True)
         p.configure(bg=LINE)
         self.confirm_win = p
+        p.chart = (key, window)  # какой график открыт: повторный щелчок по той же строке его закрывает
         k = self.root.winfo_fpixels("1i") / 96  # масштаб экрана
         box = tk.Frame(p, bg=CARD, padx=16, pady=14)
         box.pack(padx=1, pady=1)
