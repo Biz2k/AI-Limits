@@ -379,7 +379,16 @@ def main():
     cl.title.event_generate("<ButtonRelease-1>")
     yield wait()
     assert "claude" not in app.collapsed
-    assert int(str(cl.arrow.cget("font")).split()[-1]) >= 14            # стрелка сворачивания крупнее
+    assert cl.arrow.winfo_reqheight() <= cl.title.winfo_reqheight()     # стрелка не выше названия: строка прежняя
+    assert cl.arrow.winfo_reqwidth() > cl.arrow.winfo_reqheight() * 0.9 and cl.arrow.cget("text") == "▼"
+    h0 = root.winfo_height()
+    cl.arrow.event_generate("<Button-1>")
+    yield wait(0.5)
+    assert "claude" in app.collapsed
+    assert root.winfo_height() < h0 - 40, (h0, root.winfo_height())     # окно подогналось под свёрнутую плитку
+    cl.arrow.event_generate("<Button-1>")
+    yield wait(0.5)
+    assert "claude" not in app.collapsed and abs(root.winfo_height() - h0) < 4, (h0, root.winfo_height())
     cl.arrow.event_generate("<Button-1>")
     yield wait()
     assert "claude" in app.collapsed and SAVED and "claude" in SAVED[-1]["collapsed"]
@@ -536,6 +545,8 @@ def main():
     yield wait(10, lambda: not app.adding and not app.loading and "claude:second@example.com" in app.cards,
                "Claude не добавился")
     t2 = app.tile_info["claude:second@example.com"]
+    yield wait(0.5)
+    assert abs(root.winfo_height() - (app.cv.winfo_rooty() - root.winfo_rooty() + app.body.winfo_reqheight() + 14)) < 4         or root.winfo_height() >= root.winfo_screenheight() - 130, "окно не подогналось под новую плитку"
     assert t2["title"] == "second" and t2["res"]["limits"][0]["used"] == 30.0 and not t2["ide"]
     assert app.cards["claude:second@example.com"].ide_mode is None      # кнопки «→ в …» у Claude пока нет
     app.add_account("claude")
