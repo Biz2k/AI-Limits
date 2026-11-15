@@ -223,7 +223,9 @@ class PopupsMixin:
         item(T("Автозапуск после старта системы"), toggle_autostart, enabled=os.name == "nt",
              check=autostart_enabled())
         item(T("Предупреждения по прогнозу"), toggle_forecast_alerts, check=bool(self.s.get("forecast_alerts")))
-        item(T("Карточки в две колонки"), lambda: (self.toggle_two_columns(), self._show_menu(show_remove)),
+        item(T("Карточки в две колонки"),  # окно меняет ширину — меню открывается заново под кнопкой ⚙
+             lambda: (self.close_menu(), self.toggle_two_columns(), self.root.update(),
+                      self._show_menu(show_remove)),
              check=bool(self.s.get("two_columns")))
         chips(T("Автообновление"), [(T(n), s) for n, s in INTERVALS], self.interval, self.set_interval)
         chips(T("Порог предупреждения"), [(f"{v}%", v) for v in (70, 80, 90, 95)] + [(T("выкл"), 0)], int(self.warn),

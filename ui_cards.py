@@ -11,6 +11,12 @@ from ui_theme import (
 _UNSET = object()
 
 
+def lighter(color, k=0.4):
+    """Цвет #rrggbb, смешанный с белым на долю k."""
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return "#%02x%02x%02x" % tuple(round(v + (255 - v) * k) for v in (r, g, b))
+
+
 def _set(w, **kw):
     """config только для изменившихся параметров: неизменённый виджет не перерисовывается."""
     st = w.__dict__.setdefault("_st", {})
@@ -95,7 +101,13 @@ class CardView:
         self.outer = tk.Frame(app.body, bg=BG)
         self.frame = f = tk.Frame(self.outer, bg=CARD, highlightbackground=LINE, highlightthickness=1)
         f.pack(fill="both", expand=True)  # в две колонки карточки одной строки — одной высоты
-        tk.Frame(f, bg=accent, width=3).pack(side="left", fill="y")
+        # цветная полоска слева — ручка перетаскивания: при наведении светлеет, курсор «переместить»
+        self.accent = accent
+        self.strip = tk.Frame(f, bg=accent, width=12, cursor="fleur")
+        self.strip.pack(side="left", fill="y")
+        self.strip.bind("<Enter>", lambda e: self.strip_hover(True))
+        self.strip.bind("<Leave>", lambda e: self.strip_hover(False))
+        app.bind_drag(self, self.strip)
         inner = tk.Frame(f, bg=CARD)
         inner.pack(side="left", fill="both", expand=True, padx=16, pady=14)
         h = tk.Frame(inner, bg=CARD)
@@ -115,15 +127,19 @@ class CardView:
         self.ide.bind("<Enter>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=FG))
         self.ide.bind("<Leave>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=MUTED))
         self.ide_tip = Tooltip(self.ide, "")
-        # заголовок — ручка перетаскивания; щелчок по стрелке или названию сворачивает карточку
-        app.bind_drag(self, (self.arrow, self.title), click=lambda: self.collapsible and app.toggle(key))
-        app.bind_drag(self, (inner, h, self.badge, self.summary))
+        for w in (self.arrow, self.title):
+            w.bind("<Button-1>", lambda e: self.collapsible and app.toggle(key))
         self.content = tk.Frame(inner, bg=CARD)
         self.msg = tk.Label(self.content, bg=CARD, anchor="w", justify="left", wraplength=380)
         self.rows_box = tk.Frame(self.content, bg=CARD)
         self.rows_box.pack(fill="x")
         for w in (self.arrow, self.badge, self.summary, self.ide):
             _vis(w, False)
+
+    def strip_hover(self, on):
+        """Подсветка полоски: светлее при наведении и пока плитку тащат."""
+        drag = getattr(self.app, "_drag", None) or getattr(self.app, "_dnd", None) or {}
+        self.strip.config(bg=lighter(self.accent) if on or drag.get("card") is self else self.accent)
 
     def update(self, spec, warn):
         self.collapsible = spec["collapsible"]
