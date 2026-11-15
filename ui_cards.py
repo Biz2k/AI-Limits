@@ -28,7 +28,7 @@ def _vis(w, on):
 
 
 class RowView:
-    """Строка лимита: название, время сброса, отсчёт, процент, полоса и (если есть) строка прогноза.
+    """Строка лимита: название, время сброса, отсчёт, процент и полоса.
     Создаётся один раз, update() меняет только значения. on_click(виджет) — щелчок по строке (график расхода)."""
 
     def __init__(self, parent, name, on_click=None):
@@ -55,27 +55,12 @@ class RowView:
                                "или если войти этим аккаунтом в IDE Antigravity."))
         self.bar = Bar(self.f, 0, FAINT)
         self.bar.pack(fill="x", pady=(4, 0))
-        self.fc = tk.Label(self.f, bg=CARD, fg=YELLOW, font=(FONT, 8), anchor="w")  # прогноз: под полосой
-        self._fc_on = False
         if on_click:
             for w in (self.f, top, self.bar, *top.winfo_children()):
                 w.bind("<Button-1>", lambda e: on_click(self.f), add="+")
                 w.config(cursor="hand2")
 
-    def _forecast(self, line):
-        """Строка «при таком темпе хватит на …, до …» показывается, только когда лимит кончится раньше сброса.
-        line — «хватит на 2 дня 5 часов, до чт 14:00» или None."""
-        if line:
-            _set(self.fc, text=T("при таком темпе {line}", line=line))
-        if bool(line) != self._fc_on:
-            self._fc_on = bool(line)
-            if line:
-                self.fc.pack(fill="x", pady=(2, 0))
-            else:
-                self.fc.pack_forget()
-
-    def update(self, used, resets_at, seen, warn, line=None):
-        self._forecast(line if used is not None else None)
+    def update(self, used, resets_at, seen, warn):
         if used is None:
             for w in (self.pct, self.seen, self.rs, self.time):
                 _vis(w, False)
@@ -105,7 +90,7 @@ class CardView:
     def __init__(self, app, key, title, accent):
         self.app, self.key = app, key
         self.rows, self.collapsible, self.ide_mode = [], False, None
-        self._sub_on = self._content_on = False
+        self._content_on = False
         self._msg_pady = None
         self.outer = tk.Frame(app.body, bg=BG)
         f = tk.Frame(self.outer, bg=CARD, highlightbackground=LINE, highlightthickness=1)
@@ -132,7 +117,6 @@ class CardView:
         self.ide.bind("<Enter>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=FG))
         self.ide.bind("<Leave>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=MUTED))
         self.ide_tip = Tooltip(self.ide, "")
-        self.sub = tk.Label(inner, bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w")
         self.content = tk.Frame(inner, bg=CARD)
         self.msg = tk.Label(self.content, bg=CARD, anchor="w", justify="left", wraplength=380)
         self.rows_box = tk.Frame(self.content, bg=CARD)
@@ -163,8 +147,6 @@ class CardView:
                 self.ide_tip.text = T("Сделать этот аккаунт текущим в IDE Antigravity")
             _vis(self.ide, bool(mode))
 
-        if spec["sub"]:
-            _set(self.sub, text=spec["sub"])
         msg = spec["msg"]  # (текст, цвет, шрифт, отступы) или None
         if msg:
             _set(self.msg, text=msg[0], fg=msg[1], font=msg[2])
@@ -182,15 +164,13 @@ class CardView:
                          for n in names]
             if not names:
                 self.rows_box.config(height=1)  # пустая рамка не держит прежнюю высоту
-        for view, (_, used, resets_at, seen, line) in zip(self.rows, spec["rows"]):
-            view.update(used, resets_at, seen, warn, line)
+        for view, (_, used, resets_at, seen) in zip(self.rows, spec["rows"]):
+            view.update(used, resets_at, seen, warn)
 
-        sub_on, content_on = bool(spec["sub"]), bool(msg or names)
-        if (sub_on, content_on) != (self._sub_on, self._content_on):
-            self._sub_on, self._content_on = sub_on, content_on
-            self.sub.pack_forget()
-            self.content.pack_forget()
-            if sub_on:
-                self.sub.pack(fill="x")
+        content_on = bool(msg or names)
+        if content_on != self._content_on:
+            self._content_on = content_on
             if content_on:
                 self.content.pack(fill="x")
+            else:
+                self.content.pack_forget()

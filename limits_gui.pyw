@@ -390,7 +390,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
             self._placeholder = None
 
         def spec(**kw):
-            return dict(dict(collapsible=False, folded=False, badge="", sub="", summary=None, ide=None,
+            return dict(dict(collapsible=False, folded=False, badge="", summary=None, ide=None,
                              msg=None, rows=[]), **kw)
 
         loading = (T("Загрузка…"), MUTED, (FONT, 10, "italic"), (10, 2))
@@ -410,8 +410,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
             specs.append(("claude", "Claude Code", CLAUDE, spec(
                 collapsible=True, folded=folded, badge=claude["plan"],
                 summary=(T("макс {pct}%", pct=f"{mx:.0f}"), color_for(mx, self.warn)) if folded else None,
-                rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None, self.fc_line("claude", r["name"]))
-                                        for r in claude["limits"]])))
+                rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None) for r in claude["limits"]])))
 
         # Antigravity
         ide_running = getattr(self, "ide_running", False)  # IDE запущена (даже без входа)
@@ -421,7 +420,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
                      MUTED, (FONT, 10), (8, 0)))))
         for email, res in ag:
             if res is None:
-                specs.append((email, email, GOOGLE, spec(sub="Gemini", msg=loading)))
+                specs.append((email, email, GOOGLE, spec(msg=loading)))
                 continue
             if isinstance(res, Exception):
                 specs.append((email, email, GOOGLE, spec(msg=failed(res))))
@@ -443,11 +442,10 @@ class App(PopupsMixin, TrayMixin, HistoryMixin):
             else:
                 ide = None
             specs.append((email, email, GOOGLE, spec(
-                collapsible=True, folded=folded, badge=plan, sub="Gemini  ·  " + T(res.get("source", "")), ide=ide,
+                collapsible=True, folded=folded, badge=plan, ide=ide,
                 summary=(T("макс {pct}%", pct=f"{mx:.0f}"), color_for(mx, self.warn)) if folded else None,
                 msg=None if models else (T("Нет данных о лимитах Gemini"), MUTED, (FONT, 10), (8, 0)),
-                rows=[] if folded else [(m["name"], m["used"], m["resets_at"], m.get("seen"),
-                                         self.fc_line(email, m["name"])) for m in models])))
+                rows=[] if folded else [(m["name"], m["used"], m["resets_at"], m.get("seen")) for m in models])))
 
         if self.footer is None:  # строка «Максимум» под карточками
             self.footer = tk.Frame(self.body, bg=BG)

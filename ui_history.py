@@ -22,11 +22,6 @@ class HistoryMixin:
             self.fc = {}
             L.log_exception("история лимитов", type(e), e, e.__traceback__)
 
-    def fc_line(self, key, window):
-        """«хватит на 2 дня 5 часов, до чт 14:00», если по прогнозу лимит кончится раньше сброса; иначе None."""
-        fc = getattr(self, "fc", {}).get((key.lower(), window))
-        return fc["line"] if fc else None
-
     ALERT_GAP = 3600     # предупреждение по прогнозу об одном лимите — не чаще раза в час
     ALERT_SHIFT = 1800   # …и только если расчётное время исчерпания сдвинулось хотя бы на полчаса
 
@@ -38,10 +33,6 @@ class HistoryMixin:
     @staticmethod
     def _who(key):
         return "Claude" if key == "claude" else key.split("@")[0]
-
-    def forecast_soon(self):
-        """Для мини-окна трея: [(чей лимит, «хватит на …, до …»)] — только недельные лимиты."""
-        return [(self._who(k), fc["line"]) for k, _, fc in self._weekly_soon()]
 
     def forecast_alerts(self):
         """Всплывающие предупреждения по прогнозу: [(чей лимит, «чт 14:00»)]. Включаются галочкой в меню ⚙
@@ -105,11 +96,12 @@ class HistoryMixin:
             cv.create_text(x(t.timestamp()), h - bottom + 3, anchor="n", fill=FAINT, font=(FONT, 8),
                            text=day(t.weekday()) if week else f"{t:%H}:00")
             t += step
-        if len(pts) > 1:
-            cv.create_line([c for ts, used in pts for c in (x(ts), y(used))], fill=GOOGLE, width=max(2, round(2 * k)),
-                           joinstyle="round")
+        width = max(2, round(2 * k))
+        for thin, run in H.graph_path(pts):  # сбросы и нули — линией вдвое тоньше
+            cv.create_line([c for ts, used in run for c in (x(max(ts, now - span)), y(used))], fill=GOOGLE,
+                           width=width / 2 if thin else width, joinstyle="round")
         if pts:
-            ts, used = pts[-1]
+            ts, used, _ = pts[-1]
             r = max(3, round(3 * k))
             cv.create_oval(x(ts) - r, y(used) - r, x(ts) + r, y(used) + r, fill=color_for(used, self.warn), outline="")
         else:
