@@ -427,6 +427,14 @@ def main():
     assert "→" not in [w.cget("text") for w in labels] and len(labels) == 3
     assert labels[0].cget("text") == "макс." and "bold" not in str(labels[1].cget("font"))
     assert "bold" in str(labels[-1].cget("font")) and labels[-1].cget("text").endswith("%")
+    left = {t["title"]: 100 - next(r["used"] for r in (t["res"].get("models") or t["res"].get("limits"))
+                                   if r["name"] == "Неделя")
+            for _, t in app.data if isinstance(t["res"], dict)}
+    top = max(left, key=left.get)
+    assert labels[1].cget("text") == top and labels[-1].cget("text") == f"{left[top]:.0f}%", (left, labels[1].cget("text"))
+    assert app.tile_info["claude"]["title"] == top and labels[1].cget("fg") == G.ACCENT["claude"]  # не Google — тоже в счёт
+    assert L.best_weekly([("x", {"limits": [{"name": "Неделя Opus", "used": 0.0}, {"name": "Неделя", "used": 40.0}]}),
+                          ("y", {"models": [{"name": "Неделя", "used": 50.0}]})]) == ("x", 60.0)
     step("строка статуса: «Обновлено ЧЧ:ММ» без автообновления, справа «макс. email N%» без стрелки")
 
     tip = cb.ide_tip                                                    # «Сделать этот аккаунт текущим в IDE…»

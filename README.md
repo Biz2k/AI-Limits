@@ -36,7 +36,7 @@ switch the account the Antigravity IDE is signed in to with one click.
   itself are kept encrypted and refreshed by AI Limits.
 - The limits of a closed Antigravity IDE come from the cloud using the IDE's own saved sign-in.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
-- The account with the most weekly limit left is shown at the top right ("max … 100%").
+- The account with the most weekly limit left, of any service, is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace.
 

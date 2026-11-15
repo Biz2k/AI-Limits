@@ -12,7 +12,7 @@ from i18n import T
 from ui_theme import fade_in
 from ui_accounts import ACCENT
 from ui_theme import (
-    Bar, CARD, CARD_HI, CLAUDE, FAINT, FG, FONT, FONT_D, GOOGLE, GREEN, LINE, MUTED, RED, YELLOW,
+    Bar, CARD, CARD_HI, CLAUDE, FAINT, FG, FONT, FONT_D, BLUE, GREEN, LINE, MUTED, RED, YELLOW,
     color_for)
 
 GUI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "limits_gui.pyw")  # главный файл окна
@@ -33,7 +33,7 @@ class TrayMixin:
             dy = max(R - y, y - (S - 1 - R), 0)
             dx = int(round(R - (R * R - dy * dy) ** 0.5)) if dy else 0
             img.put("#1d212a", to=(dx, y, S - dx, y + 1))
-        for i, (h, col) in enumerate([(22, GREEN), (36, YELLOW), (46, CLAUDE), (30, GOOGLE)]):
+        for i, (h, col) in enumerate([(22, GREEN), (36, YELLOW), (46, CLAUDE), (30, BLUE)]):
             x = 9 + i * 12
             img.put(col, to=(x, 54 - h, x + 9, 54))
         self._icon = img

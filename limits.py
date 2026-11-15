@@ -205,12 +205,13 @@ def _future(iso):
 
 
 def best_weekly(ag):
-    """(email, % свободно) аккаунта с наибольшим остатком недельного лимита Gemini."""
+    """(имя, % свободно) аккаунта с наибольшим остатком недельного лимита — любого сервиса (Gemini — "models",
+    Claude и Codex — "limits"; у Claude берётся общая «Неделя», не «Неделя Opus/Sonnet»)."""
     best = None
     for email, res in ag:
         if not isinstance(res, dict):
             continue
-        for m in res["models"]:
+        for m in res.get("models") or res.get("limits") or []:
             if m["name"] == "Неделя" and m["used"] is not None:
                 free = 100 - m["used"]
                 if best is None or free > best[1]:
