@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 
+import accounts
 import ide_local
 from i18n import T
 import storage
@@ -120,31 +121,19 @@ def http_json(url, data=None, headers=None, form=False, method=None):
 
 
 # ================================================================ Claude Code
-def claude_fetch():
-    if not os.path.exists(storage.CLAUDE_CREDS):
-        raise RuntimeError(T("нет ~/.claude/.credentials.json — войдите в Claude Code командой `claude`"))
-    with open(storage.CLAUDE_CREDS, encoding="utf-8") as f:
-        creds = json.load(f)
-    o = creds.get("claudeAiOauth") or {}
-    if not o.get("accessToken"):
-        raise RuntimeError(T("Claude Code не залогинен через подписку (claudeAiOauth нет)"))
-
-    # токен истёк (или истечёт в ближайшую минуту) — обновляем и сохраняем обратно,
-    # так же, как это делает сам Claude Code
+def _claude_usage(o, save):
+    """Лимиты по входу claudeAiOauth o. Токен истёк (или истечёт в ближайшую минуту) — обновляем и сохраняем
+    через save(o), так же, как это делает сам Claude Code."""
     if o.get("expiresAt", 0) < (time.time() + 60) * 1000:
         d = http_json(CLAUDE_TOKEN_URL, {"grant_type": "refresh_token",
                                          "refresh_token": o["refreshToken"],
                                          "client_id": CLAUDE_CLIENT_ID},
                       headers={"User-Agent": "claude-code/2.0"})
-        # перечитываем файл прямо перед записью, чтобы не затереть чужие изменения
-        with open(storage.CLAUDE_CREDS, encoding="utf-8") as f:
-            creds = json.load(f)
-        o = creds.setdefault("claudeAiOauth", {})
         o["accessToken"] = d["access_token"]
         if d.get("refresh_token"):
             o["refreshToken"] = d["refresh_token"]
         o["expiresAt"] = int((time.time() + d.get("expires_in", 3600)) * 1000)
-        storage.atomic_write_json(storage.CLAUDE_CREDS, creds)
+        save(o)
 
     u = http_json(CLAUDE_USAGE_URL, headers={
         "Authorization": "Bearer " + o["accessToken"],
@@ -163,6 +152,40 @@ def claude_fetch():
             "extra_usage": ex.get("is_enabled", False)}
 
 
+def claude_fetch(profile=None):
+    """Лимиты Claude: по входу Claude Code (~/.claude/.credentials.json) или по своему профилю AI Limits."""
+    if profile is not None:
+        data = accounts.read_secret(profile)
+        o = data.get("claudeAiOauth") or {}
+        if not o.get("accessToken"):
+            raise RuntimeError(T("вход профиля потерян — удалите аккаунт и добавьте заново"))
+
+        def save_profile(o):
+            data["claudeAiOauth"] = o
+            accounts.write_secret(profile, data)
+        return _claude_usage(o, save_profile)
+
+    if not os.path.exists(storage.CLAUDE_CREDS):
+        raise RuntimeError(T("нет ~/.claude/.credentials.json — войдите в Claude Code командой `claude`"))
+    with open(storage.CLAUDE_CREDS, encoding="utf-8") as f:
+        creds = json.load(f)
+    o = creds.get("claudeAiOauth") or {}
+    if not o.get("accessToken"):
+        raise RuntimeError(T("Claude Code не залогинен через подписку (claudeAiOauth нет)"))
+
+    def save_main(o):
+        with open(storage.CLAUDE_CREDS, encoding="utf-8") as f:  # перечитываем, чтобы не затереть чужие изменения
+            fresh = json.load(f)
+        fresh.setdefault("claudeAiOauth", {}).update(o)
+        storage.atomic_write_json(storage.CLAUDE_CREDS, fresh)
+    return _claude_usage(o, save_main)
+
+
+def claude_installed():
+    """Есть ли вход Claude Code — тогда есть плитка программы Claude Code."""
+    return os.path.exists(storage.CLAUDE_CREDS)
+
+
 # ================================================================ Codex (подписка ChatGPT)
 CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"  # неофициальный адрес, им пользуется Codex
 
@@ -178,9 +201,43 @@ def _codex_window(w):
     return "Неделя" if secs >= 6 * 86400 else ("5 часов" if 4 * 3600 <= secs <= 6 * 3600 else None)
 
 
-def codex_fetch():
-    """Лимиты Codex аккаунта ChatGPT, под которым вошёл Codex: {"plan", "limits": [неделя, 5 часов]}.
-    Токен только читается: обновляет его сам Codex (живёт около 10 дней), чтобы не сбить ему вход."""
+OPENAI_TOKEN_URL = "https://auth.openai.com/oauth/token"
+CODEX_REFRESH_BEFORE = 86400  # профиль: обновить токен, если до истечения меньше суток
+
+
+def _codex_refresh(profile, data):
+    """Новый access-токен профиля ChatGPT (refresh-токен при этом меняется — сохраняем сразу)."""
+    t = data.get("tokens") or {}
+    cid = (t.get("oauth_provenance") or {}).get("client_id") or accounts.jwt_claims(t.get("access_token", "")).get("client_id")
+    try:
+        d = http_json(OPENAI_TOKEN_URL, {"client_id": cid, "grant_type": "refresh_token",
+                                         "refresh_token": t.get("refresh_token"), "scope": "openid profile email"})
+    except RuntimeError as e:
+        raise RuntimeError(T("вход профиля устарел — удалите аккаунт и добавьте заново ({error})", error=e)) from None
+    for k in ("id_token", "access_token", "refresh_token"):
+        if d.get(k):
+            t[k] = d[k]
+    data["tokens"] = t
+    data["last_refresh"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    accounts.write_secret(profile, data)
+    return t
+
+
+def codex_fetch(profile=None):
+    """Лимиты Codex: {"plan", "limits": [неделя, 5 часов]}. Без profile — аккаунт, под которым вошёл сам Codex;
+    его токен только читается (обновляет его сам Codex, живёт около 10 дней), чтобы не сбить ему вход.
+    Свой профиль AI Limits обновляет токен сам: этим входом больше никто не пользуется."""
+    if profile is not None:
+        data = accounts.read_secret(profile)
+        tokens = data.get("tokens") or {}
+        if accounts.jwt_claims(tokens.get("access_token", "")).get("exp", 0) < time.time() + CODEX_REFRESH_BEFORE:
+            tokens = _codex_refresh(profile, data)
+        try:
+            return _codex_usage(tokens)
+        except RuntimeError as e:
+            if not str(e).startswith("HTTP 401"):
+                raise
+        return _codex_usage(_codex_refresh(profile, data))
     if not codex_installed():
         raise RuntimeError(T("Codex не установлен или в него не входили"))
     with open(storage.CODEX_AUTH, encoding="utf-8") as f:
@@ -188,16 +245,20 @@ def codex_fetch():
     if not tokens.get("access_token"):
         raise RuntimeError(T("Codex вошёл не через аккаунт ChatGPT — лимитов подписки нет"))
     try:
-        u = http_json(CODEX_USAGE_URL, headers={
-            "Authorization": "Bearer " + tokens["access_token"],
-            "ChatGPT-Account-Id": tokens.get("account_id") or "",
-            "User-Agent": "codex_cli_rs",
-            "Accept": "application/json",
-        })
+        return _codex_usage(tokens)
     except RuntimeError as e:
         if str(e).startswith("HTTP 401"):
             raise RuntimeError(T("вход Codex устарел — запустите Codex, он обновит его сам")) from None
         raise
+
+
+def _codex_usage(tokens):
+    u = http_json(CODEX_USAGE_URL, headers={
+        "Authorization": "Bearer " + tokens["access_token"],
+        "ChatGPT-Account-Id": tokens.get("account_id") or "",
+        "User-Agent": "codex_cli_rs",
+        "Accept": "application/json",
+    })
     rows = []
     for key in ("secondary_window", "primary_window"):  # неделя сверху, как у Claude
         w = (u.get("rate_limit") or {}).get(key)

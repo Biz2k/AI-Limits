@@ -179,16 +179,12 @@ class PopupsMixin:
             self.close_menu()
             fn()
 
-        accs = L.load_accounts()
-        pos = {e: i for i, e in enumerate(self.ordered([a["email"] for a in accs]))}
-        accs.sort(key=lambda a: pos[a["email"]])  # как карточки в окне
-        item(T("Добавить Google-аккаунт"), lambda: run(self.add_account))
-        item(T("Убрать Google-аккаунт"), lambda: self._show_menu(not show_remove), enabled=bool(accs),
-             mark="▾" if show_remove else "▸")
-        if show_remove and accs:
-            for a in accs:
-                item(f"   ✕  {a['email']}", lambda e=a["email"]: run(lambda: self.remove_account(e)),
-                     fg=MUTED)
+        # «Добавить аккаунт» раскрывает выбор сервиса (show_remove здесь — раскрыт ли этот выбор)
+        item(T("Добавить аккаунт"), lambda: self._show_menu(not show_remove), mark="▾" if show_remove else "▸")
+        if show_remove:
+            for kind, label in (("claude", "Claude"), ("chatgpt", "ChatGPT"), ("google", "Google")):
+                item("   " + label, lambda k=kind: run(lambda: self.add_account(k)), fg=MUTED)
+        item(T("Управление аккаунтами"), self.show_accounts, mark="›")
         sep()
         topmost = bool(self.root.attributes("-topmost"))
         item(T("Поверх всех окон"),
@@ -268,8 +264,8 @@ class PopupsMixin:
         self._last_sig = None
         if self.data:
             self.update_history()
-            self.render(*self.data)
-            self.update_tray_tip(*self.data)
+            self.render(self.data)
+            self.update_tray_tip(self.data)
         self.set_status_updated()
 
     def open_data_folder(self):

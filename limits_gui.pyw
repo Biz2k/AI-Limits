@@ -17,13 +17,14 @@ import limits as L  # noqa: E402
 import i18n  # noqa: E402
 from i18n import T  # noqa: E402
 from ui_theme import (
-    BG, CLAUDE, CODEX, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
+    BG, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
     color_for)
 from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
 from ui_tray import TrayMixin  # noqa: E402
 from ui_history import HistoryMixin  # noqa: E402
 from ui_layout import LayoutMixin  # noqa: E402
+from ui_accounts import ACCENT, AccountsMixin  # noqa: E402
 
 # ---------------------------------------------------------------- DPI / тема
 if os.name == "nt":
@@ -55,7 +56,7 @@ def save_settings(s):
 
 
 # ---------------------------------------------------------------- приложение
-class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
+class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
     def __init__(self, root, autostart=False):
         self.root = root
         self.s = load_settings()
@@ -68,6 +69,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.data = None
         self.alerted = set()
         self.collapsed = set(self.s.get("collapsed", []))
+        self.parts = None  # загруженные данные: {часть: dict | исключение | None (грузится)}
+        try:
+            self.migrate_accounts()  # данные прежних версий — в вид 1.5.0 (один раз)
+        except Exception as e:
+            L.log_exception("перевод аккаунтов", type(e), e, e.__traceback__)
 
         root.title("AI Limits")
         root.configure(bg=BG)
@@ -192,8 +198,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         if self.interval:
             self.timer = self.root.after(self.interval * 1000, self.refresh)
 
-    # Загрузка по частям: окно рисуется сразу, Claude, IDE и каждый аккаунт Google
-    # грузятся в своих потоках и появляются по мере готовности (None = ещё грузится).
+    # Загрузка по частям: окно рисуется сразу, а программы (Claude Code, Codex, IDE Antigravity), каждый
+    # Google-аккаунт и каждый свой профиль грузятся в своих потоках и появляются по мере готовности.
     IDE_SRC = "данные IDE Antigravity"
 
     def refresh(self):
@@ -201,20 +207,10 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             return
         self.loading = True
         self.refresh_btn.config(fg=MUTED)
-        accs = L.load_accounts()
-        prev = dict(getattr(self, "ag_res", {}))
-        order = [a["email"] for a in accs]
-        order += [e for e in getattr(self, "ag_order", []) if e not in order and
-                  isinstance(prev.get(e), dict) and prev[e].get("ide_only")]
-        self.ag_order = order
-        self.ag_res = {e: prev.get(e) for e in order}          # старые значения остаются видны
-        if not hasattr(self, "claude_res"):
-            self.claude_res = None
-        if not hasattr(self, "codex_res"):
-            self.codex_res = None
-        codex = L.codex_installed()  # нет входа Codex — нет и карточки
-        self.local_emails = set()
-        self.pending = {"claude", "local", *[("ag", e) for e in order], *(["codex"] if codex else [])}
+        jobs = self.plan_jobs()
+        prev = self.parts or {}
+        self.parts = {k: prev.get(k) for k in jobs if k != "local"}  # старые значения остаются видны
+        self.pending = set(jobs)
         self.redraw()
 
         def run(key, fn, *args):
@@ -224,13 +220,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 val = e
             self.root.after(0, self._on_part, key, val)
 
-        threading.Thread(target=run, args=("claude", L.claude_fetch), daemon=True).start()
-        if codex:
-            threading.Thread(target=run, args=("codex", L.codex_fetch), daemon=True).start()
-        threading.Thread(target=run, args=("local", L.local_ide_info), daemon=True).start()
-        for a in accs:
-            threading.Thread(target=run, args=(("ag", a["email"]), L.ag_fetch, a, False, None),
-                             daemon=True).start()
+        for key, (fn, *args) in jobs.items():
+            threading.Thread(target=run, args=(key, fn, *args), daemon=True).start()
 
     def _merge(self, email, res):
         if isinstance(res, dict):
@@ -239,30 +230,19 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
 
     def _on_part(self, key, val):
         self.pending.discard(key)
-        if key == "claude":
-            self.claude_res = val
-        elif key == "codex":
-            self.codex_res = val
-        elif key == "local":
+        if key == "local":
             val = val if isinstance(val, dict) else {}
+            self.ide_local = val
             self.ide_running = bool(val.get("running"))
-            for email, li in val.get("accounts", {}).items():
-                known = next((e for e in self.ag_order if e.lower() == email), None)
-                res = {"plan": li["plan"], "models": li["rows"], "credits": None, "source": self.IDE_SRC}
-                if known is None:  # аккаунт IDE, не добавленный в список
-                    known = email
-                    self.ag_order.append(email)
-                    res["ide_only"] = True
-                self.local_emails.add(known)
-                self.pending.discard(("ag", known))
-                self.ag_res[known] = self._merge(known, res)
+            if val.get("email"):  # запущенная IDE знает свой аккаунт точнее записи входа
+                self.ide_email["google"] = val["email"]
+        elif key[0] == "google" or key == ("ide", "google"):
+            email = key[1] if key[0] == "google" else (self.ide_email.get("google") or "")
+            self.parts[key] = self._merge(email, val)
         else:
-            email = key[1]
-            if email not in self.local_emails:  # данные IDE точнее облачных
-                self.ag_res[email] = self._merge(email, val)
-        shown = getattr(self, "data", None)  # что сейчас на экране
-        if not shown or shown[0] is None or any(r is None for _, r in shown[1]) or \
-                (shown[2] is None and "codex" in self.pending):
+            self.parts[key] = val
+        shown = getattr(self, "data", None) or []  # что сейчас на экране
+        if not shown or any(t["res"] is None for _, t in shown):
             self.redraw()  # есть карточки «Загрузка…» — заполняем их по мере прихода данных
         if not self.pending:
             self._all_done()
@@ -270,50 +250,35 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
     def _all_done(self):
         self.loading = False
         self.refresh_btn.config(fg=FG)
-        self.update_history()  # запись в историю и прогнозы — до перерисовки, строка прогноза есть в карточке
-        self.redraw()  # при обновлении уже показанных данных — одна перерисовка на всё обновление
+        self.redraw()
+        self.update_history()  # запись в историю и прогнозы
         if not getattr(self, "_fitted", False) and self.root.state() == "normal":  # высота окна по содержимому
             self._fitted = True
             self.fit_height()
         self._updated_at = dt.datetime.now()  # время последнего полного обновления — для строки статуса
         want = getattr(self, "_ide_expect", None)  # после смены аккаунта IDE ждём его данные из самой IDE
         if want:
-            if want[0] in {e.lower() for e in self.local_emails} or want[1] <= 0:
+            got = (self.ide_local or {}).get("accounts", {}) if getattr(self, "ide_local", None) else {}
+            if want[0] in got or want[1] <= 0:
                 self._ide_expect = None
             else:  # IDE ещё не отдала лимиты нового аккаунта — спросить снова через 3 с
                 want[1] -= 1
                 self.root.after(3000, self.refresh)
         self.set_status_updated()
-        self.update_tray_tip(*self.data)
-        self.check_alerts(*self.data)
+        self.update_tray_tip(self.data)
+        self.check_alerts(self.data)
         self.schedule()
 
     def redraw(self):
-        self.data = (self.claude_res, [(e, self.ag_res.get(e)) for e in self.ag_order],
-                     getattr(self, "codex_res", None) if L.codex_installed() else False)
-        sig = repr((self.data, getattr(self, "ide_running", False),
-                    sorted((k, fc["line"]) for k, fc in getattr(self, "fc", {}).items())))
+        self.data = self.build_tiles()
+        sig = repr(([(k, {x: v for x, v in t.items() if x != "profile"}) for k, t in self.data],
+                    getattr(self, "ide_running", False), sorted(self.names().items())))
         if sig == getattr(self, "_last_sig", None):  # ничего не изменилось — не перерисовываем
             return
         self._last_sig = sig
-        self.render(*self.data)
+        self.render(self.data)
 
     # ------------------------------------------------ аккаунты
-    def add_account(self):
-        self.say(T("Войдите в Google в открывшемся браузере…"), GOOGLE)
-
-        def work():
-            try:
-                acc = L.ag_login()
-                accs = [x for x in L.load_accounts() if x["email"] != acc["email"]] + [acc]
-                L.save_accounts(accs)
-                self.root.after(0, lambda: (self.say(T("Добавлен {email}", email=acc["email"]), GREEN),
-                                            self.refresh()))
-            except Exception as e:
-                failed = T("Вход не выполнен: {error}", error=e)  # текст — сейчас: вне except имени e уже нет
-                self.root.after(0, lambda: self.say(failed, RED))
-        threading.Thread(target=work, daemon=True).start()
-
     def switch_ide(self, email):
         if getattr(self, "ide_switching", False):
             return
@@ -357,22 +322,13 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 self.root.after(hold * 1000 + 200, self.set_status_updated)
         threading.Thread(target=work, daemon=True).start()
 
-    def remove_account(self, email):
-        def go():
-            L.save_accounts([x for x in L.load_accounts() if x["email"] != email])
-            self.refresh()
-        self.confirm(self.menu_btn, T("Убрать {email} из списка?", email=email),
-                     T("Вернуть его можно через «Добавить Google-аккаунт»."), go)
-
     # ------------------------------------------------ оповещения
-    def check_alerts(self, claude, ag, codex=None):
+    def check_alerts(self, tiles):
         hits = []
-        for name, res in (("Claude", claude), ("Codex", codex)):
-            if isinstance(res, dict):
-                hits += [(name + " · " + r["name"], r["used"]) for r in res["limits"]]
-        for email, r in ag:
-            if isinstance(r, dict):
-                hits += [(f"{email} · {m['name']}", m["used"]) for m in r["models"] if m["used"] is not None]
+        for _, t in tiles:
+            if isinstance(t["res"], dict):
+                rows = t["res"].get("limits") or t["res"].get("models") or []
+                hits += [(t["title"] + " · " + T(r["name"]), r["used"]) for r in rows if r.get("used") is not None]
         soon = self.forecast_alerts()  # по прогнозу (если включено в меню): недельный лимит кончится раньше сброса
         if not self.warn:  # предупреждение выключено
             self.alerted = set()
@@ -395,9 +351,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.collapsed ^= {key}
         self.persist()
         if self.data:
-            self.render(*self.data)
+            self.render(self.data)
 
-    def render(self, claude, ag, codex=None):
+    def render(self, tiles):
         """Приводит карточки в соответствие с данными. Карточки и строки создаются один раз и дальше
         обновляются на месте (значения, полосы, время, метка IDE); состав карточек меняется только
         при добавлении/удалении аккаунта."""
@@ -407,7 +363,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
 
         def spec(**kw):
             return dict(dict(collapsible=False, folded=False, badge="", summary=None, ide=None,
-                             msg=None, rows=[]), **kw)
+                             msg=None, rows=[], title=None), **kw)
 
         loading = (T("Загрузка…"), MUTED, (FONT, 10, "italic"), (10, 2))
 
@@ -415,56 +371,36 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             return (str(e), RED, (FONT, 9), (8, 0))
 
         specs = []  # (ключ, заголовок, цвет, описание)
-        # Claude Code и Codex (codex is False — входа Codex нет, карточки нет)
-        for key, title, accent, res in (("claude", "Claude Code", CLAUDE, claude),
-                                        ("codex", "Codex", CODEX, codex)):
-            if res is False:
-                continue
-            if res is None:
-                specs.append((key, title, accent, spec(msg=loading)))
-            elif isinstance(res, Exception):
-                specs.append((key, title, accent, spec(msg=failed(res))))
-            else:
-                folded = key in self.collapsed
-                specs.append((key, title, accent, spec(
-                    collapsible=True, folded=folded, badge=res["plan"],
-                    summary=self.weekly_left(res["limits"]) if folded else None,
-                    msg=None if res["limits"] or folded else (T("Нет данных о лимитах"), MUTED, (FONT, 10), (8, 0)),
-                    rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None) for r in res["limits"]])))
-
-        # Antigravity
         ide_running = getattr(self, "ide_running", False)  # IDE запущена (даже без входа)
-        if not ag:
-            specs.append(("\0none", "Google Antigravity", GOOGLE, spec(
-                msg=(T("Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить Google-аккаунт»."),
-                     MUTED, (FONT, 10), (8, 0)))))
-        for email, res in ag:
+        if not tiles:
+            specs.append(("\0none", "AI Limits", GOOGLE, spec(
+                msg=(T("Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить аккаунт»."), MUTED, (FONT, 10), (8, 0)))))
+        for key, t in tiles:
+            title, accent, res = t["title"], ACCENT[t["kind"]], t["res"]
+            mode = "current" if t["ide"] else (
+                "switch" if t["kind"] == "google" and (ide_running or L.ide_installed()) else None)
             if res is None:
-                specs.append((email, email, GOOGLE, spec(msg=loading)))
+                specs.append((key, title, accent, spec(msg=loading, ide=mode)))
                 continue
             if isinstance(res, Exception):
-                specs.append((email, email, GOOGLE, spec(msg=failed(res))))
+                specs.append((key, title, accent, spec(msg=failed(res), ide=mode)))
                 continue
-            seen, models = set(), []  # убрать дубли (одинаковые имя и квота)
-            for m in res["models"]:
-                k = (m["name"], m["used"], m["resets_at"])
+            seen, rows = set(), []  # убрать дубли (одинаковые имя и квота)
+            for r in res.get("limits") or res.get("models") or []:
+                k = (r["name"], r["used"], r["resets_at"])
                 if k not in seen:
                     seen.add(k)
-                    models.append(m)
-            folded = email in self.collapsed
-            plan = res.get("plan", "")
-            plan = "ULTRA" if "ultra" in plan.lower() else ("PRO" if "pro" in plan.lower() else plan)
-            if res.get("source") == "данные IDE Antigravity":
-                ide = "current"
-            elif ide_running or L.ide_installed():  # быстрая проверка: render идёт в потоке интерфейса
-                ide = "switch"
-            else:
-                ide = None
-            specs.append((email, email, GOOGLE, spec(
-                collapsible=True, folded=folded, badge=plan, ide=ide,
-                summary=self.weekly_left(models) if folded else None,
-                msg=None if models else (T("Нет данных о лимитах Gemini"), MUTED, (FONT, 10), (8, 0)),
-                rows=[] if folded else [(m["name"], m["used"], m["resets_at"], m.get("seen")) for m in models])))
+                    rows.append(r)
+            folded = key in self.collapsed
+            plan = res.get("plan") or ""
+            if t["kind"] == "google":
+                plan = "ULTRA" if "ultra" in plan.lower() else ("PRO" if "pro" in plan.lower() else plan)
+            specs.append((key, title, accent, spec(
+                collapsible=True, folded=folded, badge=plan, ide=mode,
+                summary=self.weekly_left(rows) if folded else None,
+                msg=None if rows or folded else (T("Нет данных о лимитах Gemini") if t["kind"] == "google"
+                                                 else T("Нет данных о лимитах"), MUTED, (FONT, 10), (8, 0)),
+                rows=[] if folded else [(r["name"], r["used"], r["resets_at"], r.get("seen")) for r in rows])))
 
         if self.footer is None:  # «макс. email 100%» — справа в строке статуса
             self.footer = tk.Frame(self.status_row, bg=BG)
@@ -484,11 +420,13 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 if k not in self.cards:
                     self.cards[k] = CardView(self, k, title, accent)
             self.card_order = keys
-        for k, _, _, s in specs:
+        for k, title, _, s in specs:
+            s["title"] = title
             self.cards[k].update(s, self.warn)
 
-        best = L.best_weekly(ag)  # по остатку недельного лимита
-        footer_on = bool(best and len(ag) > 1)
+        google = [(t["title"], t["res"]) for _, t in tiles if t["kind"] == "google"]
+        best = L.best_weekly(google)  # по остатку недельного лимита Gemini
+        footer_on = bool(best and len(google) > 1)
         if footer_on:
             _set(self.footer_email, text=best[0])
             _set(self.footer_pct, text=f"{best[1]:.0f}%")

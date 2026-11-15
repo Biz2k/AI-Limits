@@ -15,6 +15,7 @@ for _k in ("ANTIGRAVITY_OAUTH_CLIENT_ID", "ANTIGRAVITY_OAUTH_CLIENT_SECRET", "AN
     os.environ.pop(_k, None)
 
 import cloud  # noqa: E402
+import accounts  # noqa: E402
 import history  # noqa: E402
 import i18n  # noqa: E402
 import ide_local  # noqa: E402
@@ -385,17 +386,119 @@ def test_codex():
     step("Codex: лимиты недели и 5 часов из входа Codex, файл только читается, устаревший вход — понятная ошибка")
 
 
+# ------------------------------------------------------------------ аккаунты 1.5.0
+def fake_jwt(claims):
+    import base64
+    enc = lambda d: base64.urlsafe_b64encode(json.dumps(d).encode()).decode().rstrip("=")  # noqa: E731
+    return "eyJhbGciOiJub25lIn0." + enc(claims) + ".sig"
+
+
+def test_accounts():
+    # имена: уникальны (без учёта регистра и пробелов), не пустые, не длиннее 32, не названия программ
+    taken = ["alex", "Работа"]
+    assert accounts.name_error("", taken) and accounts.name_error("  ", taken)
+    assert accounts.name_error("ALEX", taken) and accounts.name_error(" работа ", taken)
+    assert accounts.name_error("Claude Code", []) and accounts.name_error("x" * 40, [])
+    assert accounts.name_error("Новое имя", taken) is None
+    assert accounts.suggest_name("chatgpt", "alex@example.com", taken) == "Codex alex"
+    assert accounts.suggest_name("claude", "alex@example.com", taken + ["Claude alex"]) == "Claude alex 2"
+    assert accounts.suggest_name("google", "new@example.com", taken) == "new"
+    assert accounts.ident("google", "A@Example.com") == "a@example.com"
+    assert accounts.ident("chatgpt", "A@x") == "codex:a@x" and accounts.ident("claude", "A@x") == "claude:a@x"
+    step("имена аккаунтов: дубликат не применяется, при совпадении — приставка сервиса; ключи аккаунтов")
+
+    # вход в профиль: программа записала файл — он шифруется, открытая копия удаляется, email известен
+    pc = {"kind": "claude", "dir": "claude-test"}
+    home = os.path.join(accounts.profiles_dir(), pc["dir"])
+    os.makedirs(home, exist_ok=True)
+    with open(os.path.join(home, ".credentials.json"), "w") as f:
+        json.dump({"claudeAiOauth": {"accessToken": "sk-ant-oat-fake", "refreshToken": "sk-ant-ort-fake",
+                                     "expiresAt": 0, "subscriptionType": "pro"}}, f)
+    with open(os.path.join(home, ".claude.json"), "w") as f:
+        json.dump({"oauthAccount": {"emailAddress": "c@example.com", "organizationUuid": "org-1"}}, f)
+    pc = accounts.add_profile(accounts.finish_login(pc, timeout=5))
+    assert pc["email"] == "c@example.com" and pc["org"] == "org-1"
+    assert not os.path.exists(os.path.join(home, ".credentials.json"))
+    with open(os.path.join(home, "creds.dat"), "rb") as f:
+        assert b"sk-ant" not in f.read() or not WIN
+    px = {"kind": "chatgpt", "dir": "chatgpt-test"}
+    hx = os.path.join(accounts.profiles_dir(), px["dir"])
+    os.makedirs(hx, exist_ok=True)
+    access = fake_jwt({"exp": time.time() + 3600, "client_id": "app_fake"})
+    with open(os.path.join(hx, "auth.json"), "w") as f:
+        json.dump({"auth_mode": "chatgpt", "tokens": {"id_token": fake_jwt({"email": "x@example.com"}),
+                   "access_token": access, "refresh_token": "rt-old", "account_id": "acc-x",
+                   "oauth_provenance": {"client_id": "app_fake"}}}, f)
+    px = accounts.add_profile(accounts.finish_login(px, timeout=5))
+    assert px["email"] == "x@example.com" and px["account_id"] == "acc-x"
+    assert [q["dir"] for q in accounts.load_profiles()] == ["claude-test", "chatgpt-test"]
+    dup = {"kind": "chatgpt", "dir": "chatgpt-dup", "email": "X@example.com"}
+    os.makedirs(os.path.join(accounts.profiles_dir(), dup["dir"]), exist_ok=True)
+    assert "уже добавлен" in expect_error(RuntimeError, lambda: accounts.add_profile(dup))
+    assert not os.path.exists(os.path.join(accounts.profiles_dir(), "chatgpt-dup"))
+    empty = {"kind": "claude", "dir": "claude-empty"}
+    os.makedirs(os.path.join(accounts.profiles_dir(), empty["dir"]), exist_ok=True)
+    assert "не выполнен" in expect_error(RuntimeError, lambda: accounts.finish_login(empty, timeout=0))
+    assert not os.path.exists(os.path.join(accounts.profiles_dir(), "claude-empty"))
+    step("профиль: вход программы шифруется, открытая копия удаляется; повтор и несостоявшийся вход не сохраняются")
+
+    # лимиты по профилю: просроченные токены обновляет AI Limits и сохраняет зашифрованными
+    calls = []
+
+    def fake_http(url, data=None, headers=None, **k):
+        calls.append((url, data, headers))
+        if url == cloud.CLAUDE_TOKEN_URL:
+            return {"access_token": "sk-ant-oat-new", "refresh_token": "sk-ant-ort-new", "expires_in": 3600}
+        if url == cloud.CLAUDE_USAGE_URL:
+            return {"seven_day": {"utilization": 12, "resets_at": None}}
+        if url == cloud.OPENAI_TOKEN_URL:
+            return {"access_token": fake_jwt({"exp": time.time() + 9 * 86400}), "refresh_token": "rt-new",
+                    "id_token": fake_jwt({"email": "x@example.com"})}
+        return {"plan_type": "pro", "rate_limit": {"secondary_window": {"used_percent": 4,
+                                                                         "limit_window_seconds": 604800}}}
+    real_http, cloud.http_json = cloud.http_json, fake_http
+    try:
+        res = cloud.claude_fetch(pc)
+        assert res["plan"] == "pro" and res["limits"][0]["used"] == 12.0
+        assert accounts.read_secret(pc)["claudeAiOauth"]["refreshToken"] == "sk-ant-ort-new"
+        res = cloud.codex_fetch(px)  # токен истекает меньше чем через сутки — обновляется заранее
+        ref = next(c for c in calls if c[0] == cloud.OPENAI_TOKEN_URL)
+        assert ref[1]["client_id"] == "app_fake" and ref[1]["refresh_token"] == "rt-old", ref
+        assert res["plan"] == "pro" and accounts.read_secret(px)["tokens"]["refresh_token"] == "rt-new"
+        assert calls[-1][2]["ChatGPT-Account-Id"] == "acc-x"
+        del calls[:]
+        cloud.codex_fetch(px)  # свежий токен — без обновления
+        assert not any(c[0] == cloud.OPENAI_TOKEN_URL for c in calls)
+    finally:
+        cloud.http_json = real_http
+    accounts.remove_profile(px)
+    assert not os.path.exists(hx) and [q["dir"] for q in accounts.load_profiles()] == ["claude-test"]
+    step("профили: лимиты Claude и ChatGPT, обновление их токенов (с сохранением), удаление вместе с папкой")
+
+    STORE["blob"] = cred("old@example.com")
+    assert ide_switch.stored_ide_login() == ("old@example.com", FAKE_R)
+    history._series = None
+    history.record(None, [], items=[("claude", {"limits": [{"name": "Неделя", "used": 5, "resets_at": None}]})])
+    assert history.rename_key("claude", "claude:me@example.com") == 1
+    history._series = None
+    assert history.series("claude:me@example.com", "Неделя", 0) and not history.series("claude", "Неделя", 0)
+    step("вход IDE Antigravity для закрытой IDE; перенос истории Claude/Codex на ключи аккаунтов")
+
+
 # ------------------------------------------------------------------ вывод без токенов
 def test_no_tokens_in_output():
     cloud.load_accounts = lambda: [{"email": "a@example.com", "refresh_token": FAKE_R}]
     cloud.claude_fetch = lambda: {"plan": "pro", "limits": []}
     cloud.codex_installed = lambda: True
-    cloud.codex_fetch = lambda: {"plan": "plus", "limits": [{"name": "Неделя", "used": 12.0, "resets_at": None}]}
+    cloud.codex_fetch = lambda profile=None: {"plan": "plus", "limits": [{"name": "Неделя", "used": 12.0, "resets_at": None}]}
+    cloud.claude_fetch = lambda profile=None: {"plan": "pro", "limits": []}
     ide_local.local_ide_quota = lambda: {}
     cloud.ag_fetch = lambda acc, all_models=False, local=None: {"plan": "Pro", "models": [], "credits": None,
                                                                  "source": "облако"}
-    claude, ag, codex = limits.collect(False)
-    out = json.dumps(limits.to_jsonable(claude, ag, codex), ensure_ascii=False)
+    claude, ag, codex, profiles = limits.collect(False)
+    assert [p["email"] for p, _ in profiles] == ["c@example.com"]      # профиль Claude из test_accounts
+    out = json.dumps(limits.to_jsonable(claude, ag, codex, profiles), ensure_ascii=False)
+    assert '"claude:c@example.com"' in out and "Claude · c@example.com" in limits.render(claude, ag, 80, codex, profiles)
     assert "a@example.com" in out and '"codex": {"plan": "plus"' in out, out
     assert "Codex" in limits.render(claude, ag, 80, codex)
     assert not any(x in out for x in ("1//", "ya29.", "dpapi:", "refresh_token")), out
@@ -545,6 +648,7 @@ def main():
     test_restore_command()
     test_switch()
     test_codex()
+    test_accounts()
     test_no_tokens_in_output()
     test_history()
     test_translations()

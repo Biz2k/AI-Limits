@@ -1,0 +1,371 @@
+"""Аккаунты в окне (1.5.0): плитки программ и добавленных аккаунтов, имена, добавление аккаунтов,
+окно «Управление аккаунтами» и переименование прямо в плитке.
+
+Плитка программы (ключ "claude", "codex", "antigravity") показывает аккаунт, под которым сейчас вошла
+программа: без имени — с названием программы, с именем — под этим именем. Добавленный аккаунт, совпавший
+с аккаунтом программы, отдельной плиткой не показывается. Имена хранятся в настройках: s["names"] = {ключ: имя}.
+"""
+import threading
+import time
+import tkinter as tk
+
+import accounts as A
+import history as H
+import limits as L
+from i18n import T
+from ui_theme import CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED
+
+ACCENT = {"claude": CLAUDE, "chatgpt": CODEX, "google": GOOGLE}
+GROUP = {"claude": "Claude", "chatgpt": "ChatGPT", "google": "Google"}
+
+
+class AccountsMixin:
+    """Часть класса App (limits_gui.pyw)."""
+
+    # ------------------------------------------------ имена
+    def names(self):
+        return self.s.setdefault("names", {})
+
+    def taken_names(self, except_ident=None):
+        return [n for i, n in self.names().items() if i != except_ident]
+
+    def set_name(self, ident, name):
+        """Новое имя аккаунта. Возвращает текст ошибки (дубликат, пустое) или None."""
+        err = A.name_error(name, self.taken_names(ident))
+        if err:
+            return err
+        self.names()[ident] = " ".join(name.split())
+        self.persist()
+        self._last_sig = None
+        if getattr(self, "parts", None) is not None:
+            self.redraw()
+            self.update_tray_tip(self.data)
+        return None
+
+    # ------------------------------------------------ данные прежних версий (один раз)
+    def migrate_accounts(self):
+        """Переход на 1.5.0: имена добавленных Google-аккаунтов, ключи плиток в нижнем регистре, плитка программы
+        Antigravity в сохранённом порядке, история Claude/Codex — под ключами их аккаунтов."""
+        if self.s.get("accounts_v", 0) >= 2:
+            return
+        names = self.names()
+        for a in L.load_accounts():
+            key = a["email"].lower()
+            if key not in names:
+                names[key] = A.suggest_name("google", a["email"], list(names.values()))
+        low = lambda k: k.lower() if "@" in k else k  # noqa: E731
+        order = [low(k) for k in self.s.get("order", [])]
+        if order and "antigravity" not in order:
+            first = next((i for i, k in enumerate(order) if "@" in k), len(order))
+            order.insert(first, "antigravity")
+        if order:
+            self.s["order"] = order
+        self.collapsed = {low(k) for k in self.collapsed}
+        for old, kind, email in (("claude", "claude", A.claude_ide_email()), ("codex", "chatgpt", A.codex_ide_email())):
+            if email:
+                try:
+                    H.rename_key(old, A.ident(kind, email))
+                except Exception as e:  # история — вспомогательная
+                    L.log_exception("перенос истории", type(e), e, e.__traceback__)
+        self.s["accounts_v"] = 2
+        self.persist()
+
+    # ------------------------------------------------ что загружать
+    def plan_jobs(self):
+        """Аккаунты программ и задания загрузки: {часть: (функция, аргументы…)}."""
+        self.g_accs = L.load_accounts()
+        self.profiles = A.load_profiles()
+        self.has_prog = {"claude": L.claude_installed(), "chatgpt": L.codex_installed()}
+        self.ide_email = {"claude": A.claude_ide_email() if self.has_prog["claude"] else None,
+                          "chatgpt": A.codex_ide_email() if self.has_prog["chatgpt"] else None,
+                          "google": L.stored_ide_account()}  # закрытая IDE; запущенная уточнит в "local"
+        jobs = {"local": (L.local_ide_info,)}
+        if self.has_prog["claude"]:
+            jobs[("ide", "claude")] = (L.claude_fetch,)
+        if self.has_prog["chatgpt"]:
+            jobs[("ide", "chatgpt")] = (L.codex_fetch,)
+        for a in self.g_accs:
+            jobs[("google", a["email"].lower())] = (L.ag_fetch, a, False, None)
+        for p in self.profiles:
+            if A.ident(p["kind"], p["email"]) != A.ident(p["kind"], self.ide_email.get(p["kind"]) or ""):
+                jobs[("profile", p["dir"])] = (L.claude_fetch if p["kind"] == "claude" else L.codex_fetch, p)
+        rec = self.ide_email["google"]
+        if rec and rec.lower() not in {a["email"].lower() for a in self.g_accs}:
+            login = L.stored_ide_login()  # аккаунт закрытой IDE не добавлен — лимиты по её же входу из облака
+            if login and login[1]:
+                jobs[("ide", "google")] = (L.ag_fetch, {"email": login[0], "refresh_token": login[1]}, False, None)
+        return jobs
+
+    # ------------------------------------------------ плитки
+    def _google_res(self, email):
+        e = email.lower()
+        li = (getattr(self, "ide_local", None) or {}).get("accounts", {}).get(e)
+        if li:  # данные запущенной IDE точнее облачных
+            return self._merge(email, {"plan": li["plan"], "models": li["rows"], "credits": None,
+                                       "source": self.IDE_SRC})
+        if ("google", e) in self.parts:
+            return self.parts[("google", e)]
+        return self.parts.get(("ide", "google"))
+
+    def build_tiles(self):
+        """[(ключ плитки, плитка)]; плитка: kind, ident (ключ аккаунта и истории), email, title, ide, res."""
+        names, tiles, ide_ident = self.names(), [], {}
+        running = getattr(self, "ide_running", False)
+        for kind in A.KINDS:
+            email = self.ide_email.get(kind)
+            if kind == "google":
+                present = bool(email) or running
+            else:
+                present = self.has_prog.get(kind)
+            if not present:
+                continue
+            ident = A.ident(kind, email) if email else A.IDE_KEY[kind]
+            ide_ident[kind] = ident
+            res = self._google_res(email) if kind == "google" and email else self.parts.get(("ide", kind))
+            if kind == "google" and not email:
+                res = None if self.pending else RuntimeError(T("IDE Antigravity запущена, но вход не выполнен"))
+            tiles.append((A.IDE_KEY[kind], {"kind": kind, "ident": ident, "email": email, "ide": True,
+                                            "title": names.get(ident) or A.PRODUCT[kind], "res": res}))
+        for a in self.g_accs:
+            ident = a["email"].lower()
+            if ident != ide_ident.get("google"):
+                tiles.append((ident, {"kind": "google", "ident": ident, "email": a["email"], "ide": False,
+                                      "title": names.get(ident) or a["email"],
+                                      "res": self.parts.get(("google", ident))}))
+        for p in self.profiles:
+            ident = A.ident(p["kind"], p["email"])
+            if ident != ide_ident.get(p["kind"]):
+                tiles.append((ident, {"kind": p["kind"], "ident": ident, "email": p["email"], "ide": False,
+                                      "title": names.get(ident) or p["email"],
+                                      "res": self.parts.get(("profile", p["dir"])), "profile": p}))
+        self.tile_info = dict(tiles)
+        return tiles
+
+    def tile_title(self, ident):
+        """Как называется плитка аккаунта с ключом ident (для графика и предупреждений)."""
+        for t in getattr(self, "tile_info", {}).values():
+            if t["ident"] == ident:
+                return t["title"]
+        return self.names().get(ident) or ident
+
+    # ------------------------------------------------ все аккаунты (для «Управления аккаунтами»)
+    def all_accounts(self):
+        """{вид: [(ключ, имя или None, email, добавлен ли, профиль)]} — добавленные и аккаунты программ."""
+        out = {k: [] for k in A.KINDS}
+        names, seen = self.names(), set()
+        for a in L.load_accounts():
+            i = a["email"].lower()
+            out["google"].append((i, names.get(i), a["email"], True, None))
+            seen.add(i)
+        for p in A.load_profiles():
+            i = A.ident(p["kind"], p["email"])
+            out[p["kind"]].append((i, names.get(i), p["email"], True, p))
+            seen.add(i)
+        for kind in A.KINDS:
+            email = getattr(self, "ide_email", {}).get(kind)
+            if email and A.ident(kind, email) not in seen:
+                i = A.ident(kind, email)
+                out[kind].append((i, names.get(i), email, False, None))
+        pos = {k: n for n, k in enumerate(self.card_order)}
+        ide = {k: A.ident(k, e) for k, e in (getattr(self, "ide_email", {}) or {}).items() if e}
+        for kind in out:  # в порядке плиток; аккаунт, вошедший в программу, — на месте плитки программы
+            out[kind].sort(key=lambda r, k=kind: pos.get(A.IDE_KEY[k] if ide.get(k) == r[0] else r[0], 999))
+        return out
+
+    def notify(self, text, color, hold=10):
+        """Сообщение в строке статуса, которое обновление окна не затирает hold секунд."""
+        self.status_sticky = time.time() + hold
+        self.say(text, color)
+        self.root.after(hold * 1000 + 200, self.set_status_updated)
+
+    # ------------------------------------------------ добавление
+    def add_account(self, kind="google"):
+        """Добавить аккаунт: Google — вход в браузере; Claude и ChatGPT — вход самой программы в окне консоли
+        в отдельную папку профиля. Совпал с аккаунтом программы — плитка программы получает его имя."""
+        if getattr(self, "adding", False):
+            return
+        if kind == "google":
+            self.say(T("Войдите в Google в открывшемся браузере…"), GOOGLE)
+        else:
+            try:
+                p = A.start_login(kind)
+            except Exception as e:
+                self.notify(str(e), RED, hold=20)
+                return
+            self.say(T("Войдите в окне Claude Code — откроется браузер…") if kind == "claude"
+                     else T("Войдите в окне Codex — откроется браузер…"), ACCENT[kind])
+        self.adding = True
+
+        def work():
+            try:
+                if kind == "google":
+                    acc = L.ag_login()
+                    L.save_accounts([x for x in L.load_accounts() if x["email"] != acc["email"]] + [acc])
+                    email = acc["email"]
+                else:
+                    email = A.add_profile(A.finish_login(p))["email"]
+                ident = A.ident(kind, email)
+
+                def done():
+                    self.adding = False
+                    names = self.names()
+                    if ident not in names:
+                        names[ident] = A.suggest_name(kind, email, self.taken_names(ident))
+                        self.persist()
+                    now_in = {"claude": A.claude_ide_email, "chatgpt": A.codex_ide_email}.get(
+                        kind, lambda: (getattr(self, "ide_email", {}) or {}).get("google"))()  # аккаунт программы сейчас
+                    match = ident == A.ident(kind, now_in or "")
+                    self.notify(T("{product}: аккаунт {email} теперь называется «{name}»", product=A.PRODUCT[kind],
+                                  email=email, name=names[ident]) if match else
+                                T("Добавлен {email} — «{name}»", email=email, name=names[ident]), GREEN)
+                    self.refresh()
+                self.root.after(0, done)
+            except Exception as e:
+                failed = T("Вход не выполнен: {error}", error=e)  # текст — сейчас: вне except имени e уже нет
+
+                def fail():
+                    self.adding = False
+                    self.notify(failed, RED, hold=20)
+                self.root.after(0, fail)
+        threading.Thread(target=work, daemon=True).start()
+
+    def remove_account(self, ident, anchor=None):
+        """Удалить добавленный аккаунт (и папку его профиля) и его имя."""
+        kind, email, prof = None, ident, None
+        for k, rows in self.all_accounts().items():
+            for i, name, e, stored, p in rows:
+                if i == ident and stored:
+                    kind, email, prof = k, e, p
+
+        def go():
+            if kind == "google":
+                L.save_accounts([x for x in L.load_accounts() if x["email"].lower() != ident])
+            elif prof:
+                A.remove_profile(prof)
+            self.names().pop(ident, None)
+            self.persist()
+            self.refresh()
+            if getattr(self, "menu_win", None):
+                self.show_accounts()
+        if kind:
+            self.confirm(anchor or self.menu_btn, T("Удалить «{name}» ({email})?", name=self.names().get(ident) or email,
+                                                    email=email),
+                         T("Вернуть его можно через «Добавить аккаунт»."), go)
+
+    # ------------------------------------------------ «Управление аккаунтами» (на месте меню ⚙)
+    def show_accounts(self):
+        """Окно «Управление аккаунтами» на месте меню настроек; «←» — обратно в меню."""
+        self.close_menu()
+        p = tk.Toplevel(self.root)
+        p.overrideredirect(True)
+        p.attributes("-topmost", True)
+        p.configure(bg=LINE)
+        box = tk.Frame(p, bg=CARD, padx=10, pady=8)
+        box.pack(padx=1, pady=1)
+        self.menu_win = p
+        head = tk.Frame(box, bg=CARD)
+        head.pack(fill="x", pady=(0, 6))
+        back = tk.Label(head, text="←", bg=CARD, fg=MUTED, font=(FONT, 14), cursor="hand2", padx=4)
+        back.pack(side="left")
+        back.bind("<Button-1>", lambda e: self._show_menu(False))
+        back.bind("<Enter>", lambda e: back.config(fg=FG))
+        back.bind("<Leave>", lambda e: back.config(fg=MUTED))
+        tk.Label(head, text=T("Управление аккаунтами"), bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(side="left", padx=6)
+
+        for kind, rows in self.all_accounts().items():
+            tk.Label(box, text=GROUP[kind], bg=CARD, fg=ACCENT[kind], font=(FONT, 9, "bold"),
+                     anchor="w").pack(fill="x", pady=(8, 2), padx=4)
+            if not rows:
+                tk.Label(box, text=T("нет аккаунтов"), bg=CARD, fg=FAINT, font=(FONT, 9), anchor="w").pack(fill="x", padx=14)
+            for ident, name, email, stored, prof in rows:
+                self._account_row(box, kind, ident, name, email, stored)
+        tk.Frame(box, bg=CARD, height=4).pack()
+
+        p.update_idletasks()
+        bx = self.menu_btn.winfo_rootx()
+        right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
+        p.geometry(f"+{min(bx, right - p.winfo_reqwidth())}+{self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4}")
+        p.bind("<Escape>", self.close_menu)
+        p.focus_force()
+        p.bind("<FocusOut>", lambda e: self.root.after(120, self._menu_focus_check))
+
+    def _account_row(self, box, kind, ident, name, email, stored):
+        row = tk.Frame(box, bg=CARD)
+        row.pack(fill="x", padx=(10, 2), pady=2)
+        text = tk.Frame(row, bg=CARD)
+        text.pack(side="left", fill="x", expand=True)
+        title = tk.Label(text, text=name or A.PRODUCT[kind], bg=CARD, fg=FG if name else MUTED, font=(FONT, 10), anchor="w")
+        title.pack(fill="x")
+        sub = email + ("" if stored else "  ·  " + T("из программы"))
+        tk.Label(text, text=sub, bg=CARD, fg=FAINT, font=(FONT, 8), anchor="w").pack(fill="x")
+
+        def button(label, tip_cmd):
+            b = tk.Label(row, text=label, bg=CARD, fg=MUTED, font=(FONT, 10), cursor="hand2", padx=6, pady=2)
+            b.pack(side="right")
+            b.bind("<Enter>", lambda e: b.config(bg=CARD_HI, fg=FG))
+            b.bind("<Leave>", lambda e: b.config(bg=CARD, fg=MUTED))
+            b.bind("<Button-1>", lambda e: tip_cmd(b))
+            return b
+        if stored:
+            button("✕", lambda b: self.remove_account(ident, b))
+        button("✎", lambda b: self._rename_entry(title, ident, name or "", on_done=self.show_accounts))
+
+    # ------------------------------------------------ переименование
+    def _rename_entry(self, label, ident, current, on_done=None, font=None):
+        """Поле ввода на месте надписи label: Enter или щелчок мимо — сохранить, Esc — отменить.
+        Занятое или пустое имя не применяется: поле остаётся, рядом — сообщение."""
+        parent = label.master
+        var = tk.StringVar(value=current)
+        ent = tk.Entry(parent, textvariable=var, bg=CARD_HI, fg=FG, insertbackground=FG, relief="flat",
+                       font=font or label.cget("font"), highlightthickness=1, highlightbackground=LINE,
+                       highlightcolor=GOOGLE)
+        info = label.grid_info() if label.winfo_manager() == "grid" else None
+        if info:
+            ent.grid(row=info["row"], column=info["column"], sticky="w", padx=info.get("padx", 0))
+            label.grid_remove()
+        else:
+            ent.pack(fill="x", before=label)
+            label.pack_forget()
+        err = tk.Label(parent, bg=CARD, fg=RED, font=(FONT, 8), anchor="w")
+        state = {"done": False}
+
+        def close(save):
+            if state["done"]:
+                return
+            if save:
+                problem = self.set_name(ident, var.get())
+                if problem:
+                    err.config(text=problem)
+                    if info:
+                        err.grid(row=info["row"] + 1, column=info["column"], columnspan=5, sticky="w")
+                    else:
+                        err.pack(fill="x", after=ent)
+                    ent.focus_set()
+                    return
+            state["done"] = True
+            ent.destroy()
+            err.destroy()
+            if info:
+                label.grid()
+            elif label.winfo_exists():
+                rest = [w for w in parent.winfo_children() if w is not label and w.winfo_manager()]
+                label.pack(fill="x", **({"before": rest[0]} if rest else {}))
+            if on_done:
+                on_done()
+        ent.bind("<Return>", lambda e: close(True))
+        ent.bind("<Escape>", lambda e: close(False))
+        ent.bind("<FocusOut>", lambda e: self.root.after(150, lambda: ent.winfo_exists() and
+                                                           self.root.focus_get() is not ent and close(True)))
+        ent.focus_set()
+        ent.select_range(0, "end")
+        self.rename_entry = ent
+        return ent
+
+    def begin_rename(self, key):
+        """Двойной щелчок по имени в плитке — переименовать её аккаунт прямо в окне."""
+        card, t = self.cards.get(key), getattr(self, "tile_info", {}).get(key)
+        if not card or not t:
+            return
+        named = t["title"] != A.PRODUCT[t["kind"]] or t["ident"] in self.names()
+        self._rename_entry(card.title, t["ident"], t["title"] if named else "",
+                           on_done=lambda: card.fit_title())

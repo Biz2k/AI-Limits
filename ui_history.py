@@ -16,10 +16,9 @@ class HistoryMixin:
     def update_history(self):
         """После полного обновления: дописать значения в историю и пересчитать прогнозы (self.fc)."""
         try:
-            ag = [(e, self.ag_res.get(e)) for e in self.ag_order]
-            codex = getattr(self, "codex_res", None)
-            H.record(self.claude_res, ag, codex=codex)
-            self.fc = H.forecasts(self.claude_res, ag, codex=codex)
+            items = [(t["ident"], t["res"]) for _, t in self.data or [] if isinstance(t["res"], dict)]
+            H.record(None, [], items=items)
+            self.fc = H.forecasts(None, [], items=items)
         except Exception as e:  # история — вспомогательная: её сбой не должен мешать показу лимитов
             self.fc = {}
             L.log_exception("история лимитов", type(e), e, e.__traceback__)
@@ -32,9 +31,8 @@ class HistoryMixin:
         return sorted(((k, w, fc) for (k, w), fc in getattr(self, "fc", {}).items()
                        if fc["before_reset"] and w.lower().startswith("нед")), key=lambda x: x[2]["eta"])
 
-    @staticmethod
-    def _who(key):
-        return {"claude": "Claude", "codex": "Codex"}.get(key) or key.split("@")[0]
+    def _who(self, key):
+        return self.tile_title(key)
 
     def forecast_alerts(self):
         """Всплывающие предупреждения по прогнозу: [(чей лимит, «чт 14:00»)]. Включаются галочкой в меню ⚙
@@ -63,8 +61,10 @@ class HistoryMixin:
         week = window.lower().startswith("нед")
         span = 7 * 86400 if week else 86400
         now = time.time()
-        pts = H.series(key, window, now - span)
-        fc = getattr(self, "fc", {}).get((key.lower(), window))
+        t = getattr(self, "tile_info", {}).get(key) or {}
+        ident = t.get("ident", key)  # история и прогноз — по ключу аккаунта, плитка — по своему ключу
+        pts = H.series(ident, window, now - span)
+        fc = getattr(self, "fc", {}).get((ident.lower(), window))
 
         p = tk.Toplevel(self.root)
         fade_in(p)
@@ -76,7 +76,7 @@ class HistoryMixin:
         k = self.root.winfo_fpixels("1i") / 96  # масштаб экрана
         box = tk.Frame(p, bg=CARD, padx=16, pady=14)
         box.pack(padx=1, pady=1)
-        tk.Label(box, text={"claude": "Claude Code", "codex": "Codex"}.get(key, key) + "  ·  " + T(window), bg=CARD, fg=FG,
+        tk.Label(box, text=t.get("title", key) + "  ·  " + T(window), bg=CARD, fg=FG,
                  font=(FONT, 11, "bold"), anchor="w").pack(fill="x")
         tk.Label(box, text=T("Расход за 7 дней") if week else T("Расход за сутки"), bg=CARD, fg=MUTED,
                  font=(FONT, 9), anchor="w").pack(fill="x", pady=(2, 8))

@@ -90,9 +90,15 @@ def load(now=None):
     return _series
 
 
-def _points(claude, ag, codex=None):
-    """Свежие значения из данных окна: [(ключ, окно, %, время сброса ISO)]."""
+def _points(claude, ag, codex=None, items=None):
+    """Свежие значения из данных окна: [(ключ, окно, %, время сброса ISO)].
+    items — [(ключ аккаунта, данные плитки)] (окно 1.5.0); claude/ag/codex — прежний вид (консоль, проверки)."""
     out = []
+    for key, res in items or []:
+        if isinstance(res, dict):
+            rows = res.get("limits") or res.get("models") or []
+            out += [(key.lower(), r["name"], r["used"], r.get("resets_at")) for r in rows
+                    if r.get("used") is not None and not r.get("seen")]
     for key, res in (("claude", claude), ("codex", codex)):
         if isinstance(res, dict):
             out += [(key, r["name"], r["used"], r.get("resets_at")) for r in res.get("limits", [])]
@@ -103,12 +109,12 @@ def _points(claude, ag, codex=None):
     return out
 
 
-def record(claude, ag, now=None, codex=None):
+def record(claude, ag, now=None, codex=None, items=None):
     """Дописывает в историю текущие значения. Возвращает число записанных строк."""
     now = now or _now()
     data = load(now)
     rows = []
-    for key, win, used, resets in _points(claude, ag, codex):
+    for key, win, used, resets in _points(claude, ag, codex, items):
         pts = data.setdefault((key, win), [])
         rs = _ts(resets)
         if pts:
@@ -125,6 +131,28 @@ def record(claude, ag, now=None, codex=None):
         except OSError:
             pass
     return len(rows)
+
+
+def rename_key(old, new):
+    """Переносит историю с ключа old на new (переход на ключи аккаунтов в 1.5.0: «claude» → «claude:<email>»).
+    Возвращает число перенесённых строк."""
+    data = load()
+    moved = 0
+    for (key, win) in [k for k in data if k[0] == old]:
+        pts = data.pop((key, win))
+        data[(new, win)] = sorted(data.get((new, win), []) + pts)
+        moved += len(pts)
+    if moved:
+        try:
+            rows = sorted((ts, key, win, used, rs) for (key, win), pts in data.items() for ts, used, rs in pts)
+            tmp = history_file() + ".tmp"
+            with open(tmp, "w", encoding="utf-8", newline="") as f:
+                csv.writer(f).writerows([_iso(ts), key, win, f"{used:g}", _iso(rs) if rs else ""]
+                                        for ts, key, win, used, rs in rows)
+            os.replace(tmp, history_file())
+        except OSError:
+            pass
+    return moved
 
 
 def series(key, window, since):
@@ -194,10 +222,10 @@ def forecast(key, window, used, resets_at, now=None):
             "line": T("хватит на {span}, до {when}", span=duration(left), when=when) if before else None}
 
 
-def forecasts(claude, ag, now=None, codex=None):
+def forecasts(claude, ag, now=None, codex=None, items=None):
     """Прогнозы для всех свежих значений: {(ключ, окно): прогноз}; ключ аккаунта — email в нижнем регистре."""
     out = {}
-    for key, win, used, resets in _points(claude, ag, codex):
+    for key, win, used, resets in _points(claude, ag, codex, items):
         fc = forecast(key, win, used, resets, now)
         if fc:
             out[(key, win)] = fc

@@ -116,8 +116,11 @@ class CardView:
         h.columnconfigure(3, weight=1)
         self.head = h
         h.bind("<Configure>", lambda e: self.fit_title())
-        self.arrow = tk.Label(h, text="▾", bg=CARD, fg=MUTED, font=(FONT, 11))
+        # стрелка сворачивания — заметная, светлеет при наведении; щелчок по названию плитку не сворачивает
+        self.arrow = tk.Label(h, text="▾", bg=CARD, fg="#aab0bc", font=(FONT, 15), padx=3)
         self.arrow.grid(row=0, column=0, padx=(0, 6))
+        self.arrow.bind("<Enter>", lambda e: self.collapsible and self.arrow.config(fg=FG, bg=CARD_HI))
+        self.arrow.bind("<Leave>", lambda e: self.arrow.config(fg="#aab0bc", bg=CARD))
         self.full_title = title
         self.title = tk.Label(h, text=title, bg=CARD, fg=FG, font=(FONT, 12, "bold"))
         self.title.grid(row=0, column=1)
@@ -131,8 +134,8 @@ class CardView:
         self.ide.bind("<Enter>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=FG))
         self.ide.bind("<Leave>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=MUTED))
         self.ide_tip = Tooltip(self.ide, "")
-        for w in (self.arrow, self.title):
-            w.bind("<Button-1>", lambda e: self.collapsible and app.toggle(key))
+        self.arrow.bind("<Button-1>", lambda e: self.collapsible and app.toggle(key))
+        self.title.bind("<Double-Button-1>", lambda e: app.begin_rename(key))  # переименовать прямо в плитке
         self.content = tk.Frame(inner, bg=CARD)
         self.msg = tk.Label(self.content, bg=CARD, anchor="w", justify="left", wraplength=380)
         self.rows_box = tk.Frame(self.content, bg=CARD)
@@ -164,7 +167,9 @@ class CardView:
         self.collapsible = spec["collapsible"]
         _vis(self.arrow, self.collapsible)
         _set(self.arrow, text="▸" if spec["folded"] else "▾", cursor="hand2" if self.collapsible else "")
-        _set(self.title, cursor="hand2" if self.collapsible else "")
+        if spec.get("title") and spec["title"] != self.full_title:  # имя аккаунта сменилось
+            self.full_title = spec["title"]
+            self.fit_title()
         if spec["badge"]:
             _set(self.badge, text=spec["badge"].upper())
         _vis(self.badge, bool(spec["badge"]))
