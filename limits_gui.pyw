@@ -291,18 +291,18 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
 
     # ------------------------------------------------ аккаунты
     def add_account(self):
-        self.status.config(text=T("Войдите в Google в открывшемся браузере…"), fg=GOOGLE)
+        self.say(T("Войдите в Google в открывшемся браузере…"), GOOGLE)
 
         def work():
             try:
                 acc = L.ag_login()
                 accs = [x for x in L.load_accounts() if x["email"] != acc["email"]] + [acc]
                 L.save_accounts(accs)
-                self.root.after(0, lambda: (self.status.config(text=T("Добавлен {email}", email=acc["email"]),
-                                                               fg=GREEN), self.refresh()))
+                self.root.after(0, lambda: (self.say(T("Добавлен {email}", email=acc["email"]), GREEN),
+                                            self.refresh()))
             except Exception as e:
                 failed = T("Вход не выполнен: {error}", error=e)  # текст — сейчас: вне except имени e уже нет
-                self.root.after(0, lambda: self.status.config(text=failed, fg=RED))
+                self.root.after(0, lambda: self.say(failed, RED))
         threading.Thread(target=work, daemon=True).start()
 
     def switch_ide(self, email):
@@ -318,10 +318,10 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         if getattr(self, "ide_switching", False):
             return
         self.ide_switching = True
-        self.status.config(text=T("IDE: подготовка…"), fg=GOOGLE)
+        self.say(T("IDE: подготовка…"), GOOGLE)
 
         def say(text):
-            self.root.after(0, lambda: self.status.config(text=text, fg=GOOGLE))
+            self.root.after(0, lambda: self.say(text, GOOGLE))
 
         def work():
             try:
@@ -342,7 +342,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 # лимиты нового аккаунта нужны из IDE: обновляем сразу и повторяем, пока IDE их не отдаст (до 10 раз)
                 self._ide_expect = [expect.lower(), 10] if expect else None
                 self.refresh()
-                self.status.config(text=msg, fg=col)
+                self.say(msg, col)
             self.root.after(0, done)
             if col == GREEN:  # вернуть строку «Обновлено …»
                 self.root.after(hold * 1000 + 200, self.set_status_updated)
@@ -478,12 +478,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         if footer_on:
             _set(self.footer_email, text=best[0])
             _set(self.footer_pct, text=f"{best[1]:.0f}%")
-        if footer_on != self._footer_on:
-            self._footer_on = footer_on
-            if footer_on:
-                self.footer.pack(side="right", before=self.status)
-            else:
-                self.footer.pack_forget()
+        self._footer_on = footer_on
+        self._sync_footer()
         if relayout:
             self.layout_cards()
 
@@ -501,6 +497,26 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         if not getattr(self, "_updated_at", None):
             return  # первая загрузка ещё идёт
         self.status.config(text=T("Обновлено {time}", time=f"{self._updated_at:%H:%M}"), fg=FAINT)
+        self._status_msg = False
+        self._sync_footer()
+
+    def say(self, text, fg):
+        """Сообщение в строке статуса (смена аккаунта, ошибки): на время показа строка занята им целиком —
+        «макс. …» справа скрыта и вернётся вместе с «Обновлено ЧЧ:ММ»."""
+        self._status_msg = True
+        self.status.config(text=text, fg=fg)
+        self._sync_footer()
+
+    def _sync_footer(self):
+        """«макс. email → N%» виден, если есть что показать и в строке статуса нет сообщения."""
+        if self.footer is None:
+            return
+        on = bool(getattr(self, "_footer_on", False)) and not getattr(self, "_status_msg", False)
+        if on != bool(self.footer.winfo_manager()):
+            if on:
+                self.footer.pack(side="right", before=self.status)
+            else:
+                self.footer.pack_forget()
 
 
 def main():
