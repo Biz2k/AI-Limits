@@ -257,6 +257,21 @@ def main():
     assert app.alert_win is None
     step("предупреждение о пороге появляется; при «выкл» — нет")
 
+    if app.tray:
+        app.q.put("hover_on")
+        yield wait(0.6)
+        assert getattr(app, "popup", None) is None, "мини-окно появилось раньше секунды"
+        yield wait(1, lambda: getattr(app, "popup", None) is not None, "мини-окно не появилось через секунду")
+        app.q.put("hover_off")
+        yield wait(0.3)
+        assert app.popup is None
+        app.q.put("hover_on")
+        yield wait(0.4)
+        app.q.put("hover_off")                                         # мышь ушла раньше секунды
+        yield wait(1)
+        assert app.popup is None, "мини-окно появилось, хотя мышь ушла"
+        step("мини-окно трея появляется через секунду наведения, если мышь не ушла раньше")
+
     app.show_tray_menu(400, 400)
     yield wait()
     assert {"Открыть", "Обновить", "Выход"} <= set(texts(app.tray_menu))
