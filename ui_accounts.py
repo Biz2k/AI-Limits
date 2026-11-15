@@ -1,9 +1,9 @@
 """Аккаунты в окне (1.5.0): плитки программ и добавленных аккаунтов, имена, добавление аккаунтов,
 окно «Управление аккаунтами» и переименование прямо в плитке.
 
-Плитка программы (ключ "claude", "codex", "antigravity") показывает аккаунт, под которым сейчас вошла
-программа: без имени — с названием программы, с именем — под этим именем. Добавленный аккаунт, совпавший
-с аккаунтом программы, отдельной плиткой не показывается. Имена хранятся в настройках: s["names"] = {ключ: имя}.
+Добавленный аккаунт всегда показывается своей плиткой (ключ — ключ аккаунта); если программа вошла в него,
+у плитки метка «● IDE». Плитка программы (ключ "claude", "codex", "antigravity") — только для аккаунта программы,
+которого нет среди добавленных: без имени — с названием программы. Имена: s["names"] = {ключ: имя}.
 """
 import threading
 import time
@@ -111,7 +111,15 @@ class AccountsMixin:
         """[(ключ плитки, плитка)]; плитка: kind, ident (ключ аккаунта и истории), email, title, ide, res."""
         names, tiles, ide_ident = self.names(), [], {}
         running = getattr(self, "ide_running", False)
+        added = {a["email"].lower() for a in self.g_accs} | {A.ident(p["kind"], p["email"]) for p in self.profiles}
         for kind in A.KINDS:
+            email = self.ide_email.get(kind)
+            if email and A.ident(kind, email) in added:
+                ide_ident[kind] = A.ident(kind, email)  # добавленный аккаунт программы — на своей плитке
+                self._adopt_key(A.IDE_KEY[kind], ide_ident[kind])
+        for kind in A.KINDS:
+            if kind in ide_ident:
+                continue
             email = self.ide_email.get(kind)
             if kind == "google":
                 present = bool(email) or running
@@ -126,20 +134,34 @@ class AccountsMixin:
                 res = None if self.pending else RuntimeError(T("IDE Antigravity запущена, но вход не выполнен"))
             tiles.append((A.IDE_KEY[kind], {"kind": kind, "ident": ident, "email": email, "ide": True,
                                             "title": names.get(ident) or A.PRODUCT[kind], "res": res}))
+        # добавленные аккаунты — всегда под своим ключом: после смены аккаунта программы («→ в IDE») плитки
+        # остаются на местах, переезжает только метка «● IDE» (замечание владельца 15.11.2026)
         for a in self.g_accs:
             ident = a["email"].lower()
-            if ident != ide_ident.get("google"):
-                tiles.append((ident, {"kind": "google", "ident": ident, "email": a["email"], "ide": False,
-                                      "title": names.get(ident) or a["email"],
-                                      "res": self.parts.get(("google", ident))}))
+            ide = ident == ide_ident.get("google")
+            tiles.append((ident, {"kind": "google", "ident": ident, "email": a["email"], "ide": ide,
+                                  "title": names.get(ident) or a["email"],
+                                  "res": self._google_res(a["email"]) if ide else self.parts.get(("google", ident))}))
         for p in self.profiles:
             ident = A.ident(p["kind"], p["email"])
-            if ident != ide_ident.get(p["kind"]):
-                tiles.append((ident, {"kind": p["kind"], "ident": ident, "email": p["email"], "ide": False,
-                                      "title": names.get(ident) or p["email"],
-                                      "res": self.parts.get(("profile", p["dir"])), "profile": p}))
+            ide = ident == ide_ident.get(p["kind"])
+            tiles.append((ident, {"kind": p["kind"], "ident": ident, "email": p["email"], "ide": ide,
+                                  "title": names.get(ident) or p["email"], "profile": p,
+                                  "res": self.parts.get(("ide", p["kind"]) if ide else ("profile", p["dir"]))}))
         self.tile_info = dict(tiles)
         return tiles
+
+    def _adopt_key(self, prog, ident):
+        """1.5.0 хранила добавленный аккаунт программы под ключом плитки программы: если в сохранённом порядке
+        (и в свёрнутых) есть ключ программы, а аккаунта нет, аккаунт встаёт на его место — плитка не прыгает.
+        То же при добавлении аккаунта, в который вошла программа: он занимает место её плитки."""
+        order = self.s.get("order") or [k for k in getattr(self, "card_order", []) if not k.startswith("\0")]
+        if prog in order and ident not in order:
+            order[order.index(prog)] = ident
+            self.s["order"] = order
+            if prog in self.collapsed:
+                self.collapsed ^= {prog, ident}
+            self.persist()
 
     def tile_title(self, ident):
         """Как называется плитка аккаунта с ключом ident (для графика и предупреждений)."""
@@ -167,9 +189,8 @@ class AccountsMixin:
                 i = A.ident(kind, email)
                 out[kind].append((i, names.get(i), email, False, None))
         pos = {k: n for n, k in enumerate(self.card_order)}
-        ide = {k: A.ident(k, e) for k, e in (getattr(self, "ide_email", {}) or {}).items() if e}
-        for kind in out:  # в порядке плиток; аккаунт, вошедший в программу, — на месте плитки программы
-            out[kind].sort(key=lambda r, k=kind: pos.get(A.IDE_KEY[k] if ide.get(k) == r[0] else r[0], 999))
+        for kind in out:  # в порядке плиток; недобавленный аккаунт программы — на месте плитки программы
+            out[kind].sort(key=lambda r, k=kind: pos.get(r[0] if r[3] else A.IDE_KEY[k], 999))
         return out
 
     def notify(self, text, color, hold=10):

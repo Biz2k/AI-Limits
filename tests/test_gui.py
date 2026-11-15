@@ -131,16 +131,16 @@ def main():
     print("Проверка окна (вымышленные данные)")
     yield wait(10, lambda: not app.loading and app.data, "данные не загрузились")
     info = app.tile_info
-    assert app.card_order == ["claude", "antigravity", "b@example.com"], app.card_order
-    assert info["antigravity"]["res"]["source"] == app.IDE_SRC and info["b@example.com"]["res"]["source"] == "облако"
-    assert info["claude"]["title"] == "Claude Code" and info["antigravity"]["title"] == "a", info  # имена при переходе
+    assert app.card_order == ["claude", "a@example.com", "b@example.com"], app.card_order
+    assert info["a@example.com"]["res"]["source"] == app.IDE_SRC and info["b@example.com"]["res"]["source"] == "облако"
+    assert info["claude"]["title"] == "Claude Code" and info["a@example.com"]["title"] == "a", info  # имена при переходе
     assert app.names() == {"a@example.com": "a", "b@example.com": "b"} and app.s["accounts_v"] == 2
-    assert app.cards["antigravity"].title.cget("text") == "a" and app.cards["b@example.com"].title.cget("text") == "b"
+    assert app.cards["a@example.com"].title.cget("text") == "a" and app.cards["b@example.com"].title.cget("text") == "b"
     assert app.status.cget("text").startswith("Обновлено")
     step("плитки программ (Claude Code без имени, Antigravity под именем аккаунта IDE) и добавленный аккаунт;"
          " данные IDE важнее облачных; имена Google-аккаунтов — из email")
 
-    card = " ".join(texts(app.cards["antigravity"].outer) + texts(app.cards["b@example.com"].outer))
+    card = " ".join(texts(app.cards["a@example.com"].outer) + texts(app.cards["b@example.com"].outer))
     assert "хватит" not in card and "облако" not in card and "Gemini" not in card, card  # ни прогноза, ни источника
     assert app.fc[("a@example.com", "Неделя")]["line"].startswith("хватит на 1 день 3 часа, до ")
     assert os.path.exists(history.history_file())
@@ -166,7 +166,7 @@ def main():
     step("прогноз считается, но в карточках его нет; строки источника нет; всплывающее предупреждение выключено"
          " по умолчанию, не чаще раза в час")
 
-    app.show_history("antigravity", "Неделя", app.cards["antigravity"].rows[0].f)
+    app.show_history("a@example.com", "Неделя", app.cards["a@example.com"].rows[0].f)
     yield wait()
     win = app.confirm_win
     assert win is not None and any("раньше сброса" in t for t in texts(win))
@@ -176,11 +176,11 @@ def main():
     win.event_generate("<Escape>")
     yield wait()
     assert app.confirm_win is None
-    row = app.cards["antigravity"].rows[0].f
-    app.show_history("antigravity", "Неделя", row)
+    row = app.cards["a@example.com"].rows[0].f
+    app.show_history("a@example.com", "Неделя", row)
     yield wait()
     assert app.confirm_win is not None and "a  ·  Неделя" in texts(app.confirm_win.winfo_children()[0])
-    app.show_history("antigravity", "Неделя", row)                     # повторный щелчок по той же строке
+    app.show_history("a@example.com", "Неделя", row)                     # повторный щелчок по той же строке
     yield wait()
     assert app.confirm_win is None, "график не закрылся повторным щелчком"
     app.show_history("b@example.com", "5 часов", app.cards["b@example.com"].rows[1].f)
@@ -198,8 +198,8 @@ def main():
     app.refresh()
     yield wait(10, lambda: not app.loading)
     assert app.cards == cards and widgets(app.body) == count
-    assert app.tile_info["antigravity"]["res"]["models"][0]["used"] == 61.0
-    assert "61%" in " ".join(texts(app.cards["antigravity"].outer))
+    assert app.tile_info["a@example.com"]["res"]["models"][0]["used"] == 61.0
+    assert "61%" in " ".join(texts(app.cards["a@example.com"].outer))
     step("обновление на месте: карточки и число виджетов прежние, значение новое")
 
     app.open_menu()
@@ -239,6 +239,7 @@ def main():
     assert i18n.T("нет такого перевода") == "нет такого перевода"
     step("язык интерфейса: английский, украинский и русский переключаются на лету и сохраняются")
 
+    order_before, card_b = list(app.card_order), app.cards["b@example.com"]
     del IDE_CALLS[:]
     STATE["ide_ready_after"] = 2  # IDE отдаёт лимиты нового аккаунта только с третьего опроса
     app.switch_ide("b@example.com")
@@ -252,18 +253,28 @@ def main():
     app.confirm_win.event_generate("<Return>")
     yield wait(5, lambda: SWITCHED == ["b@example.com"])
     yield wait(15, lambda: app._ide_expect is None and not app.loading and not app.ide_switching, "нет данных IDE")
-    t_ide = app.tile_info["antigravity"]
-    assert len(IDE_CALLS) == 3 and t_ide["ident"] == "b@example.com" and t_ide["res"]["source"] == app.IDE_SRC
-    assert t_ide["title"] == "b" and app.tile_info["a@example.com"]["title"] == "a"  # a@ снова своей плиткой
-    assert "b@example.com" not in app.cards
+    t_ide = app.tile_info["b@example.com"]
+    assert len(IDE_CALLS) == 3 and t_ide["ide"] and t_ide["res"]["source"] == app.IDE_SRC
+    assert t_ide["title"] == "b" and not app.tile_info["a@example.com"]["ide"] and "antigravity" not in app.cards
+    assert app.card_order == order_before, (order_before, app.card_order)  # плитки на местах, переехала метка IDE
+    assert app.cards["b@example.com"] is card_b and card_b.ide_mode == "current" and app.cards["a@example.com"].ide_mode == "switch"
     assert "IDE теперь работает под b@example.com" == app.status.cget("text"), app.status.cget("text")
     assert not app.footer.winfo_ismapped()                              # сообщение занимает всю строку
     app.status_sticky = 0
     app.set_status_updated()
     yield wait()
     assert app.footer.winfo_ismapped() and app.status.cget("text").startswith("Обновлено")
-    step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE; плитка Antigravity"
-         " переходит на новый аккаунт, прежний — своей плиткой; на время сообщения «макс.» скрыто")
+    app.s["order"], app.collapsed = ["antigravity", "claude", "a@example.com"], {"antigravity"}  # порядок из 1.5.0
+    app._last_sig = None
+    app.redraw()
+    yield wait()
+    assert app.card_order == ["b@example.com", "claude", "a@example.com"] and app.collapsed == {"b@example.com"}
+    app.s["order"], app.collapsed = [], set()
+    app._last_sig = None
+    app.redraw()
+    yield wait()
+    step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE; плитки остаются на"
+         " местах, метка «● IDE» переходит на новый аккаунт; на время сообщения «макс.» скрыто")
 
     app.alerted = set()
     fake = [("claude", {"kind": "claude", "ident": "claude:me@example.com", "title": "Claude Code", "ide": True,
@@ -305,7 +316,7 @@ def main():
     step("меню иконки в трее")
 
     E = types.SimpleNamespace  # событие мыши: нужны только координаты экрана
-    cl, ca, cb = (app.cards[k] for k in ("claude", "antigravity", "a@example.com"))
+    cl, ca, cb = (app.cards[k] for k in ("claude", "b@example.com", "a@example.com"))
     tx, ty = cl.outer.winfo_rootx() + 30, cl.outer.winfo_rooty() + 5
     assert cb.strip.winfo_width() >= 12 and str(cb.strip.cget("cursor")) == "fleur"
     cb.strip_hover(True)
@@ -315,17 +326,17 @@ def main():
     bx, by = cb.strip.winfo_rootx() + 5, cb.strip.winfo_rooty() + 20
     app._drag_press(E(x_root=bx, y_root=by), cb)
     app._drag_motion(E(x_root=bx, y_root=by - 3))                       # меньше порога — ещё щелчок
-    assert not app._drag["on"] and app.card_order == ["claude", "antigravity", "a@example.com"]
+    assert not app._drag["on"] and app.card_order == ["claude", "a@example.com", "b@example.com"]
     y_claude = cl.outer.winfo_y()
     app._drag_motion(E(x_root=tx, y_root=ty))
-    assert app.card_order == ["a@example.com", "claude", "antigravity"], app.card_order
+    assert app.card_order == ["a@example.com", "claude", "b@example.com"], app.card_order
     assert cl.outer.place_info() and "claude" in app._dnd["anim"]       # плитка Claude поехала вниз
     yield wait(0.1)
     mid = cl.outer.winfo_y()
     assert y_claude < mid < app._slot["claude"][1], (y_claude, mid, app._slot["claude"])  # плавно, а не скачком
     app._drag_release(E(x_root=tx, y_root=ty))
     yield wait(1, lambda: app._dnd is None, "плитка не доехала до места")
-    assert SAVED[-1]["order"] == ["a@example.com", "claude", "antigravity"]
+    assert SAVED[-1]["order"] == ["a@example.com", "claude", "b@example.com"]
     assert [int(app.cards[k].outer.grid_info()["row"]) for k in app.card_order] == [0, 1, 2]
     app.show_popup()
     yield wait()
@@ -339,7 +350,7 @@ def main():
     app.close_menu()
     app.refresh()
     yield wait(10, lambda: not app.loading)
-    assert app.card_order == ["a@example.com", "claude", "antigravity"]
+    assert app.card_order == ["a@example.com", "claude", "b@example.com"]
     step("перетаскивание плитки за цветную полоску (плавно): порядок сохраняется, его повторяют мини-окно трея и меню")
 
     w0 = root.winfo_width()
@@ -348,14 +359,14 @@ def main():
     assert SAVED[-1]["two_columns"] and root.winfo_width() > w0 * 1.5, (w0, root.winfo_width())
     pos = {k: (int(app.cards[k].outer.grid_info()["row"]), int(app.cards[k].outer.grid_info()["column"]))
            for k in app.card_order}
-    assert pos == {"a@example.com": (0, 0), "claude": (0, 1), "antigravity": (1, 0)}, pos
+    assert pos == {"a@example.com": (0, 0), "claude": (0, 1), "b@example.com": (1, 0)}, pos
     assert cb.outer.winfo_height() == cl.outer.winfo_height()           # карточки одной строки — одной высоты
     assert cb.outer.winfo_rootx() < cl.outer.winfo_rootx()
     ax, ay = ca.strip.winfo_rootx() + 5, ca.strip.winfo_rooty() + 20
     app._drag_press(E(x_root=ax, y_root=ay), ca)
     app._drag_motion(E(x_root=cb.outer.winfo_rootx() + 10, y_root=cb.outer.winfo_rooty() + 10))
     app._drag_release(E(x_root=0, y_root=0))
-    assert app.card_order == ["antigravity", "a@example.com", "claude"], app.card_order
+    assert app.card_order == ["b@example.com", "a@example.com", "claude"], app.card_order
     yield wait(1, lambda: app._dnd is None, "плитка не доехала до места")
     assert int(cl.outer.grid_info()["row"]) == 1
     app._show_menu(False)
@@ -372,7 +383,7 @@ def main():
     app.s["order"] = []
     app.render(app.data)
     yield wait()
-    assert app.card_order == ["claude", "antigravity", "a@example.com"]
+    assert app.card_order == ["claude", "a@example.com", "b@example.com"]
     step("две колонки: окно расширяется, перетаскивание по сетке, возврат в одну колонку; меню ⚙ следует за кнопкой")
 
     cl.title.event_generate("<ButtonPress-1>")                         # щелчок по названию не сворачивает
@@ -447,8 +458,8 @@ def main():
     yield wait(10, lambda: not app.loading and "codex" in app.cards, "карточка Codex не появилась")
     card = " ".join(texts(app.cards["codex"].outer))
     assert "Codex" in card and "PLUS" in card and "20%" in card and "5%" in card, card
-    assert app.card_order == ["claude", "codex", "antigravity", "a@example.com"], app.card_order  # программы — первыми
-    app.s["order"] = ["a@example.com", "claude", "antigravity"]         # порядок, сохранённый до появления Codex
+    assert app.card_order == ["claude", "codex", "a@example.com", "b@example.com"], app.card_order  # программы — первыми
+    app.s["order"] = ["a@example.com", "claude", "b@example.com"]         # порядок, сохранённый до появления Codex
     app.render(app.data)
     yield wait()
     assert app.card_order[-1] == "codex", app.card_order                # новая карточка — в конце, как новый аккаунт
@@ -537,10 +548,17 @@ def main():
     assert len(accounts.load_profiles()) == 0
     accounts.finish_login = real_finish
     step("вход без окна консоли: «Отменить» в строке статуса, новый «Добавить аккаунт» отменяет незавершённый")
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "codex" in app.cards, "нет плитки Codex")
+    at = app.card_order.index("codex")
     app.add_account("chatgpt")
-    yield wait(10, lambda: not app.adding and not app.loading and "codex" in app.cards, "ChatGPT не добавился")
-    assert app.names()["codex:cx@example.com"] == "cx" and app.tile_info["codex"]["title"] == "cx"
-    assert "codex:cx@example.com" not in app.cards and "называется" in app.status.cget("text"), (list(app.cards), app.status.cget("text"))
+    yield wait(10, lambda: not app.adding and not app.loading and "codex:cx@example.com" in app.cards,
+               "ChatGPT не добавился")
+    tcx = app.tile_info["codex:cx@example.com"]
+    assert app.names()["codex:cx@example.com"] == "cx" and tcx["title"] == "cx" and tcx["ide"]
+    assert tcx["res"]["plan"] and "codex" not in app.cards and "называется" in app.status.cget("text"), \
+        (list(app.cards), app.status.cget("text"))
+    assert app.card_order.index("codex:cx@example.com") == at, (at, app.card_order)  # на месте плитки Codex
     app.add_account("claude")
     yield wait(10, lambda: not app.adding and not app.loading and "claude:second@example.com" in app.cards,
                "Claude не добавился")
