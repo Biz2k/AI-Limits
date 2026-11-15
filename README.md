@@ -16,28 +16,41 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 
 ## Features
 
+**Limits**
 - Weekly and 5-hour limits for Claude Code and for each Google account, with reset time and countdown.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
+- The account with the most weekly limit left is shown at the top right ("max … → 100%").
+- Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
+  will last at the current pace.
+
+**Antigravity IDE account**
 - **"→ to IDE" button**: signs the Antigravity IDE in to another saved account without the Google sign-in page
   (the IDE is restarted; the previous credentials are backed up and restored if the switch fails).
-- Tray icon with a mini window on hover, a dark context menu, minimize/close to tray, start with Windows.
-  Clicking the icon brings the window to the front, or hides it to the tray if it is already in focus.
-- The account with the most weekly limit left is shown at the top right ("max …"). A collapsed card shows how
-  much of its weekly limit is left.
-- "→ to IDE" also works when the IDE is closed: it starts the IDE (or the `agy` CLI if the IDE is not installed)
-  and skips the switch when the IDE is already signed in to that account.
-- Pop-up warning above the clock when a limit crosses the threshold you chose (70–95 %, or off).
-- Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
-  will last at the current pace. Pop-up forecast warnings are off by default (⚙ → Forecast warnings).
-- Auto refresh (1 / 5 / 15 min), always-on-top, collapsible cards. Cards update in place without flicker.
-- Drag a card by the colored strip on its left to reorder (the other cards slide aside); the tray window and the account list in the menu follow the same order.
-  Cards can be laid out in two columns (⚙ → Cards in two columns).
+- Works when the IDE is closed too: it starts the IDE (or the `agy` CLI if the IDE is not installed) and skips the
+  switch when the IDE is already signed in to that account.
+
+**Window**
+- Cards can be collapsed (a collapsed card shows how much of its weekly limit is left), reordered by dragging the
+  colored strip on their left (the other cards slide aside), and laid out in two columns (⚙ → Cards in two columns).
+- Auto refresh (1 / 5 / 15 min), always-on-top. Cards update in place without flicker.
+- Tray icon with a mini window on hover (same card order), a dark context menu, minimize/close to tray, start with
+  Windows. Clicking the icon brings the window to the front, or hides it to the tray if it is already in focus.
+- Pop-up warning above the clock when a limit crosses the threshold you chose (70–95 %, or off). Pop-up forecast
+  warnings are off by default (⚙ → Forecast warnings).
+
+**Other**
 - Console version with plain-text and JSON output.
 - Version shown in the settings menu and in the exe properties; unhandled errors are written to a log file.
 - Tokens and keys are stored encrypted (Windows DPAPI).
 - No third-party packages: Python standard library only (tkinter + ctypes).
 
-<img src="docs/screenshot-alert.png" alt="Threshold warning" width="340">
+<p>
+  <img src="docs/screenshot-two-columns.png" alt="Two columns" width="520">
+</p>
+<p>
+  <img src="docs/screenshot-chart.png" alt="Usage chart" width="340">
+  <img src="docs/screenshot-alert.png" alt="Threshold warning" width="340">
+</p>
 
 ## Download
 
@@ -62,7 +75,6 @@ not needed to run it.
 
 For running from source:
 
-
 - Windows 11
 - Python 3.13 (the Microsoft Store build works)
 - Claude Code installed and signed in (`~/.claude/.credentials.json`) — for the Claude card
@@ -79,8 +91,8 @@ For running from source:
    ```
 
 3. Enter the OAuth client id and secret of the Antigravity application with `python limits.py keys`
-   (close the window first, start it again afterwards). They are **not included** in this repository or in the exe. These are the values
-   the Antigravity application itself signs in with; the open-source npm package
+   (close the window first, start it again afterwards). They are **not included** in this repository or in the
+   exe. These are the values the Antigravity application itself signs in with; the open-source npm package
    [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage) contains them in its source code — that is
    where this project took them from. The app keeps them in
    `%APPDATA%\ai-limits\keys.dat`, encrypted for your Windows account. Alternatively, set the
@@ -143,6 +155,10 @@ credentials, closes the IDE, writes the token into the IDE's entry in Windows Cr
 (`gemini:antigravity`) and two files in `%APPDATA%\Antigravity\`, starts the IDE again and checks through the IDE's
 local server that the right account is signed in. If the IDE shows another account or no account, the backup is
 restored.
+
+If the IDE is closed and its saved sign-in already belongs to the chosen account, the app just starts the IDE.
+If the IDE is not installed, the `agy` CLI is started instead (it uses the same Credential Manager entry); there
+is no IDE server to check the account against in that case.
 
 This is not an official mechanism. It may stop working after an IDE update, and you use it at your own risk.
 
