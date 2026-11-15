@@ -22,9 +22,8 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
   (the IDE is restarted; the previous credentials are backed up and restored if the switch fails).
 - Tray icon with a mini window on hover, a dark context menu, minimize/close to tray, start with Windows.
 - Pop-up warning above the clock when a limit crosses the threshold you chose (70–95 %, or off).
-- Usage history (kept for 60 days) and a forecast: when a limit is going to run out before it resets, the card
-  and the tray window say how long it will last; click a limit row to see its usage chart. Pop-up forecast
-  warnings are off by default (⚙ → Forecast warnings).
+- Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
+  will last at the current pace. Pop-up forecast warnings are off by default (⚙ → Forecast warnings).
 - Auto refresh (1 / 5 / 15 min), always-on-top, collapsible cards. Cards update in place without flicker.
 - Console version with plain-text and JSON output.
 - Version shown in the settings menu and in the exe properties; unhandled errors are written to a log file.

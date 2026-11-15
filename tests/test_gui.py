@@ -126,9 +126,9 @@ def main():
     assert app.status.cget("text").startswith("Обновлено")
     step("карточки Claude и двух аккаунтов; данные IDE важнее облачных")
 
-    card = " ".join(texts(app.cards["a@example.com"].outer))
-    assert "при таком темпе хватит на 1 день 3 часа, до " in card and app.cards["a@example.com"].rows[0]._fc_on, card
-    assert not app.cards["a@example.com"].rows[1]._fc_on and not app.cards["b@example.com"].rows[0]._fc_on
+    card = " ".join(texts(app.cards["a@example.com"].outer) + texts(app.cards["b@example.com"].outer))
+    assert "хватит" not in card and "облако" not in card and "Gemini" not in card, card  # ни прогноза, ни источника
+    assert app.fc[("a@example.com", "Неделя")]["line"].startswith("хватит на 1 день 3 часа, до ")
     assert os.path.exists(history.history_file())
     assert getattr(app, "alert_win", None) is None and app.forecast_alerts() == []  # по умолчанию выключены
     app.s["forecast_alerts"] = True
@@ -149,7 +149,8 @@ def main():
     assert "a" in shown and any(t.startswith("до ") for t in shown) and not any("неделя" in t for t in shown), shown
     app.hide_alert()
     app.s["forecast_alerts"] = False
-    step("прогноз: строка в карточке; всплывающее предупреждение выключено по умолчанию, не чаще раза в час")
+    step("прогноз считается, но в карточках его нет; строки источника нет; всплывающее предупреждение выключено"
+         " по умолчанию, не чаще раза в час")
 
     app.show_history("a@example.com", "Неделя", app.cards["a@example.com"].rows[0].f)
     yield wait()
@@ -165,10 +166,9 @@ def main():
     app.close_confirm()
     app.show_popup()
     yield wait()
-    assert any(t.startswith("a — хватит на 1 день") for t in texts(app.popup)), texts(app.popup)
-    assert not any("5 час" in t and "хватит" in t for t in texts(app.popup))
+    assert not any("хватит" in t for t in texts(app.popup)), texts(app.popup)
     app.hide_popup()
-    step("график расхода по щелчку на строке; прогноз в мини-окне трея")
+    step("график расхода по щелчку на строке; в мини-окне трея прогноза нет")
 
     cards, count = dict(app.cards), widgets(app.body)
     STATE["week_a"] = 61.0
@@ -193,12 +193,9 @@ def main():
     def seen():
         return " | ".join(texts(root)) + " | " + app.status.cget("text")
     cards = len(app.cards)
-    for code, words in (("en", ("Refresh", "Week", "5 hours", "Antigravity IDE data", "cloud", "Maximum",
-                                "Updated", "auto 5 min", "at this pace lasts", "→ to IDE")),
-                        ("uk", ("Оновити", "Тиждень", "5 годин", "дані IDE Antigravity", "хмара", "Оновлено",
-                                "авто 5 хв", "за такого темпу вистачить на", "→ в IDE")),
-                        ("ru", ("Обновить", "Неделя", "5 часов", "данные IDE Antigravity", "облако", "Обновлено",
-                                "авто 5 мин", "при таком темпе хватит на"))):
+    for code, words in (("en", ("Refresh", "Week", "5 hours", "Maximum", "Updated", "auto 5 min", "→ to IDE")),
+                        ("uk", ("Оновити", "Тиждень", "5 годин", "Оновлено", "авто 5 хв", "→ в IDE")),
+                        ("ru", ("Обновить", "Неделя", "5 часов", "Обновлено", "авто 5 мин"))):
         app.set_lang(code)
         yield wait()
         text = seen()

@@ -127,8 +127,33 @@ def record(claude, ag, now=None):
 
 
 def series(key, window, since):
-    """Точки ряда не раньше since: [(время, %)]."""
-    return [(ts, used) for ts, used, _ in load().get((key.lower(), window), []) if ts >= since]
+    """Точки ряда не раньше since: [(время, %, время сброса или None)]."""
+    return [p for p in load().get((key.lower(), window), []) if p[0] >= since]
+
+
+def graph_path(pts):
+    """Ломаная графика по точкам [(время, %, сброс)]: [(тонкая ли, [(время, %), …])], отрезки подряд одной толщины
+    слиты. Если время сброса прошло между двумя точками (простой: программа не опрашивала), значение держится до
+    сброса, падает до нуля и лежит на нуле до следующей точки — без косой линии через простой. Сброс без известного
+    времени (значение упало) — вертикальный спуск у следующей точки. Вертикальные спуски и отрезки на нуле — тонкие."""
+    segs = []
+    for (t0, u0, r0), (t1, u1, _) in zip(pts, pts[1:]):
+        if r0 and t0 < r0 <= t1:
+            segs += [(t0, u0, r0, u0), (r0, u0, r0, 0.0), (r0, 0.0, t1, 0.0), (t1, 0.0, t1, u1)]
+        elif u1 < u0 - 1:
+            segs += [(t0, u0, t1, u0), (t1, u0, t1, u1)]
+        else:
+            segs.append((t0, u0, t1, u1))
+    runs = []
+    for t0, u0, t1, u1 in segs:
+        if (t0, u0) == (t1, u1):
+            continue
+        thin = t0 == t1 or (u0 < 0.5 and u1 < 0.5)
+        if runs and runs[-1][0] == thin and runs[-1][1][-1] == (t0, u0):
+            runs[-1][1].append((t1, u1))
+        else:
+            runs.append((thin, [(t0, u0), (t1, u1)]))
+    return runs
 
 
 def when_text(ts, now=None):

@@ -325,10 +325,6 @@ class TrayMixin:
                          font=(FONT, 8, "bold")).pack(side="left", padx=(6, 0))
             cell(i, 2, week)
             cell(i, 5, h5)
-        for j, (name, line) in enumerate(self.forecast_soon()[:3]):  # прогноз по недельным лимитам
-            tk.Label(box, text=f"{name} — {line}", bg=CARD, fg=YELLOW, font=(FONT, 8),
-                     anchor="w").grid(row=len(rows) + 2 + j, column=0, columnspan=7, sticky="w",
-                                      pady=(6 if j == 0 else 0, 0))
 
         p.update_idletasks()
         w, h = p.winfo_reqwidth(), p.winfo_reqheight()
