@@ -2,10 +2,10 @@
 
 **English** | [Русский](README.ru.md)
 
-A small Windows 11 desktop app that shows how much of your **Claude Code** (Pro subscription), **Codex**
+A small Windows 11 desktop app that shows how much of your **Claude Code** (Claude subscription), **Codex**
 (ChatGPT subscription) and **Google Antigravity** (Gemini models) usage limits you have spent — for several
-Google accounts at once.
-It can also switch the account the Antigravity IDE is signed in to with one click.
+accounts of each service at once. It picks up the accounts your apps are already signed in to by itself and can
+switch the account the Antigravity IDE is signed in to with one click.
 
 > Unofficial project. Not affiliated with Anthropic, OpenAI or Google. The window is available in English, Russian and
 > Ukrainian (⚙ → Language); the console version is in Russian.
@@ -89,7 +89,7 @@ not needed to run it.
   setx ANTIGRAVITY_OAUTH_CLIENT_SECRET "<client secret>"
   ```
 
-  The Claude Code card works without them.
+  The Claude Code and Codex cards (and added Claude and ChatGPT accounts) work without them.
 
 ## Requirements
 
@@ -138,6 +138,8 @@ python limits.py switch-ide --browser  the same through the Google sign-in page
 python limits.py restore-ide           put back the IDE credentials from the latest backup
 python limits.py keys                  enter the Antigravity OAuth client id and secret
 ```
+
+Claude and ChatGPT accounts added in the window are shown by the console version too (`--json`: `profiles`).
 
 ## Building the exe
 
@@ -189,7 +191,8 @@ This is not an official mechanism. It may stop working after an IDE update, and 
 ## Disclaimer
 
 - The app relies on undocumented endpoints of Anthropic, OpenAI and Google and on the OAuth clients of Claude
-  Code and Antigravity (for Codex it uses the sign-in Codex already has). They can change or be blocked at any time, and using them may be against the services' terms.
+  Code, Codex and Antigravity (extra Claude and ChatGPT accounts are signed in by Claude Code and Codex themselves).
+  They can change or be blocked at any time, and using them may be against the services' terms.
 - To get both Gemini limits for accounts that are not signed in to the IDE, requests to Google identify the app
   as a recent version of the Antigravity IDE.
 - It reads and writes credentials of the Antigravity IDE on your machine.
