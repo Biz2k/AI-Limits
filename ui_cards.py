@@ -117,7 +117,9 @@ class CardView:
         self.head = h
         h.bind("<Configure>", lambda e: self.fit_title())
         # стрелка сворачивания — заметная, светлеет при наведении; щелчок по названию плитку не сворачивает
-        self.arrow = tk.Label(h, text="▾", bg=CARD, fg="#aab0bc", font=(FONT, 15), padx=3)
+        # крупный треугольник ▼/▶ мелким шрифтом: стрелка заметнее, а высота строки — как у названия;
+        # кнопка шире (padx), а не выше
+        self.arrow = tk.Label(h, text="▼", bg=CARD, fg="#aab0bc", font=(FONT, 9), padx=7, pady=0)
         self.arrow.grid(row=0, column=0, padx=(0, 6))
         self.arrow.bind("<Enter>", lambda e: self.collapsible and self.arrow.config(fg=FG, bg=CARD_HI))
         self.arrow.bind("<Leave>", lambda e: self.arrow.config(fg="#aab0bc", bg=CARD))
@@ -166,7 +168,8 @@ class CardView:
     def update(self, spec, warn):
         self.collapsible = spec["collapsible"]
         _vis(self.arrow, self.collapsible)
-        _set(self.arrow, text="▸" if spec["folded"] else "▾", cursor="hand2" if self.collapsible else "")
+        _set(self.arrow, text="▶" if spec["folded"] else "▼", cursor="hand2" if self.collapsible else "",
+             font=(FONT, 10 if spec["folded"] else 9))  # ▶ в этом шрифте мельче ▼ — на пункт крупнее
         if spec.get("title") and spec["title"] != self.full_title:  # имя аккаунта сменилось
             self.full_title = spec["title"]
             self.fit_title()

@@ -149,6 +149,16 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         need = min(need, self.root.winfo_screenheight() - 120)
         x, y = self.root.winfo_x(), self.root.winfo_y()
         self.root.geometry(f"{width or self.root.winfo_width()}x{need}+{x}+{y}")
+        self._fit_req = self.body.winfo_reqheight()
+
+    def autofit(self):
+        """Подогнать высоту окна, если высота содержимого изменилась: свернули/развернули плитку, добавили или
+        убрали аккаунт, плитка заполнилась после «Загрузка…». Развёрнутое на весь экран окно не трогаем."""
+        if not getattr(self, "_fitted", False) or self.root.state() != "normal" or getattr(self, "_dnd", None):
+            return
+        self.root.update_idletasks()
+        if self.body.winfo_reqheight() != getattr(self, "_fit_req", None):
+            self.fit_height()
 
     def _on_body(self, _):
         self.cv.configure(scrollregion=self.cv.bbox("all"))
@@ -352,6 +362,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.persist()
         if self.data:
             self.render(self.data)
+        self.autofit()
 
     def render(self, tiles):
         """Приводит карточки в соответствие с данными. Карточки и строки создаются один раз и дальше
@@ -434,6 +445,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self._sync_footer()
         if relayout:
             self.layout_cards()
+        self.root.after_idle(self.autofit)  # содержимое стало выше или ниже — подогнать окно
 
         self.set_status_updated()
 
