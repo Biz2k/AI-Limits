@@ -208,7 +208,7 @@ class PopupsMixin:
             try:
                 set_autostart(not autostart_enabled())
             except Exception as e:
-                self.status.config(text=T("Автозапуск: {error}", error=e), fg=RED)
+                self.say(T("Автозапуск: {error}", error=e), RED)
             self._show_menu(show_remove)
 
         def toggle_forecast_alerts():
@@ -274,7 +274,7 @@ class PopupsMixin:
             os.makedirs(L.APPDIR, exist_ok=True)
             os.startfile(L.APPDIR)
         except Exception as e:
-            self.status.config(text=T("Не удалось открыть папку: {error}", error=e), fg=RED)
+            self.say(T("Не удалось открыть папку: {error}", error=e), RED)
 
     def _menu_focus_check(self):
         w = getattr(self, "menu_win", None)

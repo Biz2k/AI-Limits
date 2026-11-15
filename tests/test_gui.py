@@ -231,7 +231,13 @@ def main():
     yield wait(15, lambda: app._ide_expect is None and not app.loading and not app.ide_switching, "нет данных IDE")
     assert len(IDE_CALLS) == 3 and app.ag_res["b@example.com"]["source"] == app.IDE_SRC, len(IDE_CALLS)
     assert "IDE теперь работает под b@example.com" == app.status.cget("text"), app.status.cget("text")
-    step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE")
+    assert not app.footer.winfo_ismapped()                              # сообщение занимает всю строку
+    app.status_sticky = 0
+    app.set_status_updated()
+    yield wait()
+    assert app.footer.winfo_ismapped() and app.status.cget("text").startswith("Обновлено")
+    step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE; на время сообщения"
+         " «макс.» скрыто")
 
     app.alerted = set()
     app.check_alerts({"plan": "pro", "limits": rows(85.0, 2.0)}, [])
