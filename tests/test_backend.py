@@ -305,6 +305,28 @@ def test_switch():
         assert ide_switch.ide_switch_account("new@example.com", timeout=5) == "new@example.com"
         assert json.loads(STORE["blob"])["id_token_email"] == "new@example.com"
 
+        # IDE закрыта, а в ней и так нужный аккаунт -> только запуск: не закрываем, не пишем, не проверяем
+        IDE["run"] = False
+        del LOG[:]
+        assert ide_switch.ide_switch_account("new@example.com") == "new@example.com"
+        assert LOG == ["start"], LOG
+
+        # IDE не установлена -> запускается консольная agy.exe (учётные данные те же); сервера IDE нет — без проверки
+        keep_exe, ide_local.find_ide_executable = ide_local.find_ide_executable, lambda: None
+        ide_local.find_cli_executable = lambda: r"C:\fake\agy.exe"
+        ide_local.start_cli = lambda path: LOG.append("cli")
+        ide_local.find_ide_servers = lambda diag=None: []
+        try:
+            IDE["run"] = False
+            STORE["blob"] = cred("old@example.com")
+            del LOG[:]
+            assert ide_switch.ide_switch_account("new@example.com", timeout=0.05) == "new@example.com"
+            assert LOG == ["stop", "write", "cli"] and b"new@example.com" in STORE["blob"], LOG
+            del LOG[:]
+            assert ide_switch.ide_switch_account("new@example.com") == "new@example.com" and LOG == ["cli"], LOG
+        finally:
+            ide_local.find_ide_executable = keep_exe
+
         # IDE не закрылась -> отмена, учётные данные не тронуты
         IDE["run"] = True
         ide_local.find_ide_servers = lambda diag=None: [(Srv(), {"email": "old@example.com"})]

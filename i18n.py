@@ -95,14 +95,12 @@ TEXTS = {
     "Убрать {email} из списка?": ("Remove {email} from the list?", "Прибрати {email} зі списку?"),
     "Вернуть его можно через «Добавить Google-аккаунт».": ("You can add it back with “Add Google account”.",
                                                           "Повернути його можна через «Додати Google-акаунт»."),
-    "макс {pct}%": ("max {pct}%", "макс {pct}%"),
     "Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить Google-аккаунт».":
         ("No accounts yet. Add one: ⚙ → “Add Google account”.",
          "Акаунтів немає. Додайте його в меню ⚙ → «Додати Google-акаунт»."),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
-    "Максимум": ("Maximum", "Максимум"),
-    "  ·  авто {interval}": ("  ·  auto {interval}", "  ·  авто {interval}"),
-    "Обновлено {time}{auto}": ("Updated {time}{auto}", "Оновлено {time}{auto}"),
+    "макс.": ("max", "макс."),
+    "Обновлено {time}": ("Updated {time}", "Оновлено {time}"),
     # ---- время
     "1 мин": ("1 min", "1 хв"),
     "5 мин": ("5 min", "5 хв"),

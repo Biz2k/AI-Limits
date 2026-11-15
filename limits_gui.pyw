@@ -17,7 +17,7 @@ import limits as L  # noqa: E402
 import i18n  # noqa: E402
 from i18n import T  # noqa: E402
 from ui_theme import (
-    BG, CLAUDE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, INTERVALS, MUTED, RED, Tooltip, YELLOW,
+    BG, CLAUDE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
     color_for)
 from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
@@ -89,9 +89,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
         self.menu_btn = FlatButton(hdr, "⚙", self.open_menu)
         self.menu_btn.pack(side="right", padx=(0, 6))
         self.menu_tip = Tooltip(self.menu_btn, T("Настройки"))
-        self.status = tk.Label(root, text="", bg=BG, fg=FAINT, font=(FONT, 9), anchor="w")
+        # строка под заголовком: слева «Обновлено ЧЧ:ММ» (и сообщения), справа «макс. email → 100%»
+        self.status_row = tk.Frame(root, bg=BG)
+        self.status_row.pack(fill="x", padx=20)
+        self.status = tk.Label(self.status_row, text="", bg=BG, fg=FAINT, font=(FONT, 9), anchor="w")
         root.iconphoto(True, self.make_icon())
-        self.status.pack(fill="x", padx=20)
+        self.status.pack(side="left", fill="x", expand=True)
 
         # scrollable body
         wrap = tk.Frame(root, bg=BG)
@@ -409,10 +412,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             specs.append(("claude", "Claude Code", CLAUDE, spec(msg=failed(claude))))
         else:
             folded = "claude" in self.collapsed
-            mx = max((r["used"] for r in claude["limits"]), default=0)
             specs.append(("claude", "Claude Code", CLAUDE, spec(
                 collapsible=True, folded=folded, badge=claude["plan"],
-                summary=(T("макс {pct}%", pct=f"{mx:.0f}"), color_for(mx, self.warn)) if folded else None,
+                summary=self.weekly_left(claude["limits"]) if folded else None,
                 rows=[] if folded else [(r["name"], r["used"], r["resets_at"], None) for r in claude["limits"]])))
 
         # Antigravity
@@ -435,7 +437,6 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                     seen.add(k)
                     models.append(m)
             folded = email in self.collapsed
-            mx = max((m["used"] for m in models if m["used"] is not None), default=0)
             plan = res.get("plan", "")
             plan = "ULTRA" if "ultra" in plan.lower() else ("PRO" if "pro" in plan.lower() else plan)
             if res.get("source") == "данные IDE Antigravity":
@@ -446,19 +447,19 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 ide = None
             specs.append((email, email, GOOGLE, spec(
                 collapsible=True, folded=folded, badge=plan, ide=ide,
-                summary=(T("макс {pct}%", pct=f"{mx:.0f}"), color_for(mx, self.warn)) if folded else None,
+                summary=self.weekly_left(models) if folded else None,
                 msg=None if models else (T("Нет данных о лимитах Gemini"), MUTED, (FONT, 10), (8, 0)),
                 rows=[] if folded else [(m["name"], m["used"], m["resets_at"], m.get("seen")) for m in models])))
 
-        if self.footer is None:  # строка «Максимум» под карточками
-            self.footer = tk.Frame(self.body, bg=BG)
+        if self.footer is None:  # «макс. email → 100%» — справа в строке статуса
+            self.footer = tk.Frame(self.status_row, bg=BG)
             self._footer_on = False
-            tk.Label(self.footer, text=T("Максимум"), bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 6))
-            self.footer_email = tk.Label(self.footer, bg=BG, fg=GOOGLE, font=(FONT, 10, "bold"))
-            self.footer_email.pack(side="left", padx=(0, 6))
-            tk.Label(self.footer, text="→", bg=BG, fg=FAINT, font=(FONT, 10, "bold")).pack(side="left", padx=(0, 6))
+            tk.Label(self.footer, text=T("макс."), bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 5))
+            self.footer_email = tk.Label(self.footer, bg=BG, fg=GOOGLE, font=(FONT, 9))
+            self.footer_email.pack(side="left", padx=(0, 5))
+            tk.Label(self.footer, text="→", bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 5))
             self.footer_pct = tk.Label(self.footer, bg=BG, fg=GREEN, font=(FONT, 10, "bold"))
-            self.footer_pct.pack(side="left", padx=(0, 6))
+            self.footer_pct.pack(side="left")
 
         keys = self.ordered([s[0] for s in specs])  # порядок — как пользователь расставил перетаскиванием
         relayout = keys != self.card_order
@@ -479,21 +480,27 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
             _set(self.footer_pct, text=f"{best[1]:.0f}%")
         if footer_on != self._footer_on:
             self._footer_on = footer_on
-            relayout = True
+            if footer_on:
+                self.footer.pack(side="right", before=self.status)
+            else:
+                self.footer.pack_forget()
         if relayout:
             self.layout_cards()
 
         self.set_status_updated()
 
+    def weekly_left(self, rows):
+        """Свёрнутая плитка: остаток недельного лимита («72%»), цвет — по израсходованному."""
+        used = next((r["used"] for r in rows if r["name"].startswith("Неделя") and r["used"] is not None), None)
+        return ("—", FAINT) if used is None else (f"{100 - used:.0f}%", color_for(used, self.warn))
+
     def set_status_updated(self):
         import time as _t  # сообщение о смене аккаунта IDE не затираем ещё 20 секунд
         if getattr(self, "ide_switching", False) or _t.time() < getattr(self, "status_sticky", 0):
             return
-        nxt = T("  ·  авто {interval}", interval=T(dict((s, n) for n, s in INTERVALS)[self.interval])) \
-            if self.interval else ""
         if not getattr(self, "_updated_at", None):
             return  # первая загрузка ещё идёт
-        self.status.config(text=T("Обновлено {time}{auto}", time=f"{self._updated_at:%H:%M}", auto=nxt), fg=FAINT)
+        self.status.config(text=T("Обновлено {time}", time=f"{self._updated_at:%H:%M}"), fg=FAINT)
 
 
 def main():

@@ -168,6 +168,25 @@ def _ide_write_account(acc, token_resp, writer_id):
     return scope_file, saved_user_scope
 
 
+def stored_ide_account():
+    """Email, под которым IDE войдёт при запуске (поле id_token_email записи gemini:antigravity), или None."""
+    try:
+        cred = winapi._wincred_read(IDE_CRED_TARGET)
+        return json.loads(cred["blob"].decode("utf-8")).get("id_token_email") if cred and cred.get("blob") else None
+    except Exception:
+        return None
+
+
+def _launch(exe_path, cli_path):
+    """Запуск IDE, а если она не установлена — консольной версии agy.exe."""
+    if exe_path:
+        ide_local.start_ide(exe_path)
+        ide_local._ide_log("IDE запущена:", exe_path)
+    else:
+        ide_local.start_cli(cli_path)
+        ide_local._ide_log("IDE не установлена — запущен agy.exe:", cli_path)
+
+
 class IdeSwitchUnverified(RuntimeError):
     """Токен записан и IDE запущена, но её локальный сервер так и не ответил — проверить аккаунт не удалось."""
 
@@ -206,6 +225,17 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         if cur and cur.lower() == acc["email"].lower():
             ide_local._ide_log("IDE уже работает под", cur, "— перезапуск не нужен")
             return cur
+    exe_path = ide_local.find_ide_executable()
+    cli_path = None if exe_path else ide_local.find_cli_executable()
+    if not exe_path and not cli_path:
+        raise RuntimeError(T("Не найден Antigravity.exe — убедитесь, что IDE Antigravity установлена"))
+    if not was_running and not bad_token:  # IDE закрыта, а в ней и так нужный аккаунт — только запустить
+        stored = stored_ide_account()
+        if stored and stored.lower() == acc["email"].lower():
+            ide_local._ide_log("IDE закрыта, в ней уже", stored, "— запуск без смены аккаунта")
+            say(T("Запуск IDE Antigravity…"))
+            _launch(exe_path, cli_path)
+            return stored
 
     say(T("Проверка токена Google…"))
     try:
@@ -226,10 +256,6 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         token_resp = dict(token_resp, access_token="ai-limits-rollback-test")
         acc = dict(acc, refresh_token="ai-limits-rollback-test")
 
-    exe_path = ide_local.find_ide_executable()
-    if not exe_path:
-        raise RuntimeError(T("Не найден Antigravity.exe — убедитесь, что IDE Antigravity установлена"))
-
     say(T("Резервное копирование прежних настроек…"))
     backup_meta = backup_ide_credentials()
     previous = backup_meta.get("previous_email")
@@ -249,8 +275,9 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         scope_file, saved_user_scope = _ide_write_account(acc, token_resp, writer_id)
 
         say(T("Перезапуск IDE Antigravity…"))
-        ide_local.start_ide(exe_path)
-        ide_local._ide_log("IDE запущена:", exe_path)
+        _launch(exe_path, cli_path)
+        if not exe_path:  # у консольной версии нет окна IDE и её сервера — проверять вход негде
+            return acc["email"]
 
         say(T("Проверка входа через GetUserStatus…"))
         started = time.time()
@@ -301,7 +328,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         try:
             ide_local.stop_ide()
             restore_ide_credentials(backup_meta)
-            if was_running:
+            if was_running and exe_path:
                 ide_local.start_ide(exe_path)
             ide_local._ide_log("Откат выполнен, прежний аккаунт:", str(previous))
         except Exception as e2:

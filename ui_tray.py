@@ -4,6 +4,7 @@ import ctypes.wintypes
 import os
 import queue
 import sys
+import time
 import tkinter as tk
 
 import limits as L
@@ -13,6 +14,9 @@ from ui_theme import (
     color_for)
 
 GUI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "limits_gui.pyw")  # главный файл окна
+
+
+FOCUS_GRACE = 0.6  # с: окно было в фокусе до щелчка по иконке трея (щелчок сам забирает фокус)
 
 
 class TrayMixin:
@@ -172,6 +176,11 @@ class TrayMixin:
         self.root.state("normal")
         self.root.lift()
         self.root.focus_force()
+        if os.name == "nt":  # окно поверх остальных и в фокусе (щелчок по иконке трея это разрешает)
+            try:
+                ctypes.windll.user32.SetForegroundWindow(ctypes.windll.user32.GetParent(self.root.winfo_id()))
+            except Exception:
+                pass
 
     def _poll_tray(self):
         try:
@@ -180,10 +189,12 @@ class TrayMixin:
                 if isinstance(ev, tuple):  # ("menu", x, y) — правый щелчок по иконке
                     self.show_tray_menu(ev[1], ev[2])
                 elif ev == "toggle":
-                    if self.root.state() != "normal":
-                        self.show_window()
-                    else:
+                    # окно в фокусе — в трей; открыто, но не в фокусе (или свёрнуто, в трее) — показать и дать фокус.
+                    # Щелчок по иконке сам забирает фокус у окна, поэтому «в фокусе» — было в фокусе только что.
+                    if self.root.state() == "normal" and time.time() - getattr(self, "_fg_at", 0) < FOCUS_GRACE:
                         self.to_tray()
+                    else:
+                        self.show_window()
                 elif ev == 1:
                     self.show_window()
                 elif ev == 2:
@@ -198,7 +209,19 @@ class TrayMixin:
                     self.hide_popup()
         except queue.Empty:
             pass
+        if self.app_has_focus():
+            self._fg_at = time.time()
         self.root.after(80, self._poll_tray)
+
+    @staticmethod
+    def app_has_focus():
+        """Активно ли сейчас окно этой программы (главное, меню ⚙ или подтверждение)."""
+        if os.name != "nt":
+            return False
+        u = ctypes.windll.user32
+        pid = ctypes.c_ulong()
+        u.GetWindowThreadProcessId(u.GetForegroundWindow(), ctypes.byref(pid))
+        return pid.value == os.getpid()
 
     # ------------------------------------------------ меню иконки в трее
     def close_tray_menu(self, *_):

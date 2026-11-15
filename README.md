@@ -21,6 +21,11 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 - **"→ to IDE" button**: signs the Antigravity IDE in to another saved account without the Google sign-in page
   (the IDE is restarted; the previous credentials are backed up and restored if the switch fails).
 - Tray icon with a mini window on hover, a dark context menu, minimize/close to tray, start with Windows.
+  Clicking the icon brings the window to the front, or hides it to the tray if it is already in focus.
+- The account with the most weekly limit left is shown at the top right ("max …"). A collapsed card shows how
+  much of its weekly limit is left.
+- "→ to IDE" also works when the IDE is closed: it starts the IDE (or the `agy` CLI if the IDE is not installed)
+  and skips the switch when the IDE is already signed in to that account.
 - Pop-up warning above the clock when a limit crosses the threshold you chose (70–95 %, or off).
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace. Pop-up forecast warnings are off by default (⚙ → Forecast warnings).
