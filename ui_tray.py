@@ -10,8 +10,9 @@ import tkinter as tk
 import limits as L
 from i18n import T
 from ui_theme import fade_in
+from ui_accounts import ACCENT
 from ui_theme import (
-    Bar, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, FONT_D, GOOGLE, GREEN, LINE, MUTED, RED, YELLOW,
+    Bar, CARD, CARD_HI, CLAUDE, FAINT, FG, FONT, FONT_D, GOOGLE, GREEN, LINE, MUTED, RED, YELLOW,
     color_for)
 
 GUI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "limits_gui.pyw")  # главный файл окна
@@ -314,19 +315,14 @@ class TrayMixin:
         self.hide_popup()
         if not self.data or self.root.state() == "withdrawn" and False:
             return
-        claude, ag, codex = (tuple(self.data) + (None,))[:3]
-        rows = {}  # ключ карточки -> строка; порядок — как у карточек в окне
-        for key, title, accent, res in (("claude", "Claude Code", CLAUDE, claude), ("codex", "Codex", CODEX, codex)):
-            if isinstance(res, dict):
-                d = {r["name"]: r["used"] for r in res["limits"]}
-                rows[key] = (title, accent, d.get("Неделя"), d.get("5 часов"), None)
-        for email, r in ag:
+        rows = {}  # ключ плитки -> строка; порядок — как у плиток в окне
+        for key, t in self.data:
+            r, accent = t["res"], ACCENT[t["kind"]]
             if not isinstance(r, dict):
-                rows[email] = (email.split("@")[0], GOOGLE, None, None, "загрузка" if r is None else "ошибка")
+                rows[key] = (t["title"], accent, None, None, "загрузка" if r is None else "ошибка")
                 continue
-            d = {m["name"]: m["used"] for m in r["models"]}
-            ide = r.get("source") == "данные IDE Antigravity"
-            rows[email] = (email.split("@")[0], GOOGLE, d.get("Неделя"), d.get("5 часов"), "IDE" if ide else None)
+            d = {m["name"]: m["used"] for m in r.get("limits") or r.get("models") or []}
+            rows[key] = (t["title"], accent, d.get("Неделя"), d.get("5 часов"), "IDE" if t["ide"] else None)
         rows = [rows[k] for k in self.ordered(list(rows))]
 
         p = tk.Toplevel(self.root)
@@ -384,26 +380,21 @@ class TrayMixin:
         p.geometry(f"+{x}+{y}")
         self.popup = p
 
-    def update_tray_tip(self, claude, ag, codex=None):
+    def update_tray_tip(self, tiles):
         if not getattr(self, "tray", None):
             return
 
         def fmt(v):
             return "—" if v is None else f"{v:.0f}%"
         lines = {}  # ключ карточки -> строка подсказки; порядок — как у карточек в окне
-        for key, name, res in (("claude", "Claude", claude), ("codex", "Codex", codex)):
-            if isinstance(res, dict):
-                d = {r["name"]: r["used"] for r in res["limits"]}
-                lines[key] = T("{name}  нед {week} · 5ч {five}", name=name,
-                               week=fmt(d.get("Неделя")), five=fmt(d.get("5 часов")))
-        for email, r in ag:
-            name = email.split("@")[0][:11]
+        for key, t in tiles or []:
+            name, r = t["title"][:14], t["res"]
             if not isinstance(r, dict):
-                lines[email] = f"{name}  {T('загрузка…') if r is None else T('ошибка')}"
+                lines[key] = f"{name}  {T('загрузка…') if r is None else T('ошибка')}"
                 continue
-            d = {m["name"]: m["used"] for m in r["models"]}
-            lines[email] = T("{name}  нед {week} · 5ч {five}", name=name, week=fmt(d.get("Неделя")),
-                             five=fmt(d.get("5 часов")))
+            d = {m["name"]: m["used"] for m in r.get("limits") or r.get("models") or []}
+            lines[key] = T("{name}  нед {week} · 5ч {five}", name=name, week=fmt(d.get("Неделя")),
+                           five=fmt(d.get("5 часов")))
         tip = "\n".join(lines[k] for k in self.ordered(list(lines)))
         if len(tip) > 127:
             tip = tip[:126] + "…"

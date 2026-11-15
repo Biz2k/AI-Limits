@@ -191,4 +191,4 @@ class LayoutMixin:
         if getattr(self, "popup", None):
             self.show_popup()
         if self.data:
-            self.update_tray_tip(*self.data)
+            self.update_tray_tip(self.data)

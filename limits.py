@@ -24,6 +24,7 @@ from version import __version__
 
 import storage
 import winapi
+import accounts
 import cloud
 import ide_local
 import ide_switch
@@ -91,7 +92,7 @@ def fmt_reset(iso):
 
 
 # ================================================================ вывод
-def render(claude, ag, warn, codex=None):
+def render(claude, ag, warn, codex=None, profiles=()):
     out = []
     now = dt.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     out.append(bold("AI limits") + dim(f"  ·  {now}  ·  % = израсходовано"))
@@ -116,6 +117,18 @@ def render(claude, ag, warn, codex=None):
         for r in codex["limits"]:
             flag = c("91", "  ⚠") if r["used"] >= warn else ""
             out.append(f"  {r['name']:<22} {bar(r['used'])} {r['used']:5.0f}%  {dim(fmt_reset(r['resets_at']))}{flag}")
+        out.append("")
+
+    # --- свои профили Claude и ChatGPT (добавлены в окне: ⚙ → «Добавить аккаунт»)
+    for prof, res in profiles:
+        title = ("Claude" if prof["kind"] == "claude" else "Codex") + " · " + prof["email"]
+        if isinstance(res, Exception):
+            out.append(bold(title) + "  " + c("91", f"ошибка: {res}"))
+        else:
+            out.append(bold(title) + dim(f"  ·  план {res['plan']}"))
+            for r in res["limits"]:
+                flag = c("91", "  ⚠") if r["used"] >= warn else ""
+                out.append(f"  {r['name']:<22} {bar(r['used'])} {r['used']:5.0f}%  {dim(fmt_reset(r['resets_at']))}{flag}")
         out.append("")
 
     # --- Antigravity
@@ -157,6 +170,8 @@ def collect(all_models):
     with cf.ThreadPoolExecutor(max_workers=8) as ex:
         fc = ex.submit(cloud.claude_fetch)
         fx = ex.submit(cloud.codex_fetch) if cloud.codex_installed() else None
+        fp = [(p, ex.submit(cloud.claude_fetch if p["kind"] == "claude" else cloud.codex_fetch, p))
+              for p in accounts.load_profiles()]
         local = ex.submit(ide_local.local_ide_quota).result()
         fa = [(a["email"], ex.submit(cloud.ag_fetch, a, all_models, local)) for a in accs]
 
@@ -172,7 +187,7 @@ def collect(all_models):
             if email not in known:
                 ag.append((email, {"plan": li["plan"], "models": li["rows"], "credits": None,
                                    "source": "данные IDE Antigravity", "ide_only": True}))
-        return res(fc), merge_with_cache(ag), (res(fx) if fx else None)
+        return res(fc), merge_with_cache(ag), (res(fx) if fx else None), [(p, res(f)) for p, f in fp]
 
 
 # ---------------------------------------------------------------- кэш лимитов
@@ -238,10 +253,11 @@ def merge_with_cache(ag):
     return out
 
 
-def to_jsonable(claude, ag, codex=None):
+def to_jsonable(claude, ag, codex=None, profiles=()):
     j = lambda r: {"error": str(r)} if isinstance(r, Exception) else r
     return {"time": dt.datetime.now().astimezone().isoformat(), "claude": j(claude), "codex": j(codex),
-            "antigravity": {e: j(r) for e, r in ag}}
+            "antigravity": {e: j(r) for e, r in ag},
+            "profiles": {accounts.ident(p["kind"], p["email"]): j(r) for p, r in profiles}}
 
 
 # ================================================================ main
@@ -327,13 +343,13 @@ def main():
         return
 
     while True:
-        claude, ag, codex = collect(a.all_models)
+        claude, ag, codex, profiles = collect(a.all_models)
         if a.json:
-            print(json.dumps(to_jsonable(claude, ag, codex), ensure_ascii=False, indent=2))
+            print(json.dumps(to_jsonable(claude, ag, codex, profiles), ensure_ascii=False, indent=2))
         else:
             if a.watch:
                 print("\033[2J\033[H", end="")
-            print(render(claude, ag, a.warn, codex))
+            print(render(claude, ag, a.warn, codex, profiles))
         if not a.watch:
             break
         try:

@@ -17,10 +17,24 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 
 ## Features
 
+**Accounts**
+- On the first start every account your apps are already signed in to shows up by itself: one card each for
+  **Claude Code**, **Codex** and the **Antigravity** IDE, titled with the app name. A card always follows the
+  account its app is signed in to right now.
+- ⚙ → **Add account**: Claude, ChatGPT or Google. Claude and ChatGPT accounts sign in through Claude Code
+  (`claude auth login`) and Codex (`codex login`) into a separate profile folder of AI Limits, so your own
+  Claude Code and Codex sign-ins stay untouched; Google signs in in the browser. If the new account is the one an
+  app is signed in to, that app's card simply takes its name.
+- Every account has a name of your choice, unique within the app (by default the part of the email before «@»; if
+  taken, with the service in front: "Codex alex"). Rename it by double-clicking the name on its card or in
+  ⚙ → **Manage accounts**, which lists the accounts by service with the email below the name and can delete them.
+
 **Limits**
-- Weekly and 5-hour limits for Claude Code, Codex and each Google account, with reset time and countdown.
-- Codex: the card appears by itself when Codex is signed in with a ChatGPT account (`~/.codex/auth.json`);
-  the app only reads that sign-in and never refreshes it — Codex does that itself.
+- Weekly and 5-hour limits for Claude Code, Codex (ChatGPT subscription) and each Google account (Gemini), with
+  reset time and countdown.
+- The app's own sign-ins of Claude Code and Codex are only read; the tokens of the profiles AI Limits signed in
+  itself are kept encrypted and refreshed by AI Limits.
+- The limits of a closed Antigravity IDE come from the cloud using the IDE's own saved sign-in.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
 - The account with the most weekly limit left is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
@@ -47,6 +61,9 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 - Tokens and keys are stored encrypted (Windows DPAPI).
 - No third-party packages: Python standard library only (tkinter + ctypes).
 
+<p>
+  <img src="docs/screenshot-accounts.png" alt="Manage accounts" width="340">
+</p>
 <p>
   <img src="docs/screenshot-two-columns.png" alt="Two columns" width="520">
 </p>
@@ -81,7 +98,8 @@ For running from source:
 - Windows 11
 - Python 3.13 (the Microsoft Store build works)
 - Claude Code installed and signed in (`~/.claude/.credentials.json`) — for the Claude card
-- Codex signed in with a ChatGPT account (`~/.codex/auth.json`) — optional, for the Codex card
+- Codex signed in with a ChatGPT account (`~/.codex/auth.json`) — optional, for the Codex card; Codex
+  (`codex.exe`) or Claude Code (`claude.exe`) is also needed to add more ChatGPT or Claude accounts
 - Antigravity IDE — optional, needed for IDE data and account switching
 - PyInstaller 6.x — only if you want to build the exe
 
@@ -102,7 +120,8 @@ For running from source:
    `%APPDATA%\ai-limits\keys.dat`, encrypted for your Windows account. Alternatively, set the
    `ANTIGRAVITY_OAUTH_CLIENT_ID` and `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables, or, when running
    from source, copy `local_keys.example.py` to `local_keys.py` and fill it in.
-4. Add a Google account: ⚙ → "Add Google account" (a Google sign-in page opens in your browser).
+4. Add accounts if you need more than the ones your apps are signed in to: ⚙ → "Add account" → Claude,
+   ChatGPT or Google.
 
 ## Console version
 
@@ -140,9 +159,10 @@ Everything lives in `%APPDATA%\ai-limits\`:
 | File | Contents |
 | --- | --- |
 | `accounts.json` | Google refresh tokens of the accounts you added (encrypted) |
+| `profiles.json`, `profiles\` | Claude and ChatGPT accounts you added: one folder each, the sign-in in `creds.dat` (encrypted) |
 | `keys.dat` | Antigravity OAuth client id and secret (encrypted) |
 | `cache.json` | last seen limit values (kept until each limit resets) |
-| `gui.json` | window settings |
+| `gui.json` | window settings, account names |
 | `history.csv` | limit values over time, kept for 60 days (no tokens) |
 | `ide_backups\` | copies of the IDE credentials taken before each account switch (last 5, encrypted) |
 | `ide_switch.log` | account switch log (tokens are masked) |

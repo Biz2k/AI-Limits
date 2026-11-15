@@ -177,6 +177,19 @@ def stored_ide_account():
         return None
 
 
+def stored_ide_login():
+    """(email, refresh_token) входа, сохранённого IDE (запись gemini:antigravity), или None. Нужен, чтобы
+    показывать лимиты аккаунта закрытой IDE из облака, даже если этот аккаунт не добавлен в AI Limits."""
+    try:
+        cred = winapi._wincred_read(IDE_CRED_TARGET)
+        if not (cred and cred.get("blob")):
+            return None
+        d = json.loads(cred["blob"].decode("utf-8"))
+        return d.get("id_token_email"), (d.get("token") or {}).get("refresh_token")
+    except Exception:
+        return None
+
+
 def _launch(exe_path, cli_path):
     """Запуск IDE, а если она не установлена — консольной версии agy.exe."""
     if exe_path:

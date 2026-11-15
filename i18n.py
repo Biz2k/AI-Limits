@@ -92,14 +92,74 @@ TEXTS = {
     "никто": ("nobody", "ніхто"),
     "Не удалось сменить аккаунт: {error}": ("Could not switch the account: {error}",
                                             "Не вдалося змінити акаунт: {error}"),
-    "Убрать {email} из списка?": ("Remove {email} from the list?", "Прибрати {email} зі списку?"),
-    "Вернуть его можно через «Добавить Google-аккаунт».": ("You can add it back with “Add Google account”.",
-                                                          "Повернути його можна через «Додати Google-акаунт»."),
-    "Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить Google-аккаунт».":
-        ("No accounts yet. Add one: ⚙ → “Add Google account”.",
-         "Акаунтів немає. Додайте його в меню ⚙ → «Додати Google-акаунт»."),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
     "макс.": ("max", "макс."),
+    'IDE Antigravity запущена, но вход не выполнен':
+        ('The Antigravity IDE is running but not signed in',
+         'IDE Antigravity запущено, але вхід не виконано'),
+    '{product}: аккаунт {email} теперь называется «{name}»':
+        ('{product}: account {email} is now called “{name}”',
+         '{product}: акаунт {email} тепер називається «{name}»'),
+    'Аккаунт {email} уже добавлен':
+        ('Account {email} is already added',
+         'Акаунт {email} уже додано'),
+    'Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить аккаунт».':
+        ('No accounts. Add one in ⚙ → “Add account”.',
+         'Акаунтів немає. Додайте його в меню ⚙ → «Додати акаунт».'),
+    'Вернуть его можно через «Добавить аккаунт».':
+        ('You can add it back with “Add account”.',
+         'Повернути його можна через «Додати акаунт».'),
+    'Войдите в окне Claude Code — откроется браузер…':
+        ('Sign in in the Claude Code window — a browser will open…',
+         'Увійдіть у вікні Claude Code — відкриється браузер…'),
+    'Войдите в окне Codex — откроется браузер…':
+        ('Sign in in the Codex window — a browser will open…',
+         'Увійдіть у вікні Codex — відкриється браузер…'),
+    'Вход не выполнен':
+        ('Not signed in',
+         'Вхід не виконано'),
+    'Добавить аккаунт':
+        ('Add account',
+         'Додати акаунт'),
+    'Добавлен {email} — «{name}»':
+        ('Added {email} — “{name}”',
+         'Додано {email} — «{name}»'),
+    'Имя «{name}» уже занято':
+        ('The name “{name}” is already taken',
+         "Ім'я «{name}» уже зайняте"),
+    'Имя длиннее {n} символов':
+        ('The name is longer than {n} characters',
+         "Ім'я довше за {n} символів"),
+    'Имя не может быть пустым':
+        ("The name can't be empty",
+         "Ім'я не може бути порожнім"),
+    'Не найден Claude Code (claude.exe) — установите его':
+        ('Claude Code (claude.exe) not found — install it',
+         'Не знайдено Claude Code (claude.exe) — встановіть його'),
+    'Не найден Codex (codex.exe) — установите его':
+        ('Codex (codex.exe) not found — install it',
+         'Не знайдено Codex (codex.exe) — встановіть його'),
+    'Не удалось узнать email вошедшего аккаунта':
+        ("Couldn't get the email of the signed-in account",
+         'Не вдалося дізнатися email акаунта, що увійшов'),
+    'Удалить «{name}» ({email})?':
+        ('Delete “{name}” ({email})?',
+         'Видалити «{name}» ({email})?'),
+    'Управление аккаунтами':
+        ('Manage accounts',
+         'Керування акаунтами'),
+    'вход профиля потерян — удалите аккаунт и добавьте заново':
+        ('the profile sign-in is lost — delete the account and add it again',
+         'вхід профілю втрачено — видаліть акаунт і додайте знову'),
+    'вход профиля устарел — удалите аккаунт и добавьте заново ({error})':
+        ('the profile sign-in has expired — delete the account and add it again ({error})',
+         'вхід профілю застарів — видаліть акаунт і додайте знову ({error})'),
+    'из программы':
+        ('from the app',
+         'з програми'),
+    'нет аккаунтов':
+        ('no accounts',
+         'немає акаунтів'),
     "Нет данных о лимитах": ("No limit data", "Немає даних про ліміти"),
     "Codex не установлен или в него не входили": ("Codex is not installed or not signed in",
                                                   "Codex не встановлено або в нього не входили"),
@@ -166,8 +226,6 @@ TEXTS = {
     # ---- меню и всплывающие окна
     "Нет": ("No", "Ні"),
     "Да": ("Yes", "Так"),
-    "Добавить Google-аккаунт": ("Add Google account", "Додати Google-акаунт"),
-    "Убрать Google-аккаунт": ("Remove Google account", "Прибрати Google-акаунт"),
     "Поверх всех окон": ("Always on top", "Поверх усіх вікон"),
     "Автозапуск: {error}": ("Autostart: {error}", "Автозапуск: {error}"),
     "Сворачивать в трей": ("Minimize to tray", "Згортати в трей"),
