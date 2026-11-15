@@ -16,6 +16,7 @@ from ui_theme import (
 GUI_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "limits_gui.pyw")  # главный файл окна
 
 
+HOVER_DELAY_MS = 1000  # мини-окно появляется, если мышь задержалась на иконке трея на секунду
 FOCUS_GRACE = 0.6  # с: окно было в фокусе до щелчка по иконке трея (щелчок сам забирает фокус)
 
 
@@ -186,6 +187,8 @@ class TrayMixin:
         try:
             while True:
                 ev = self.q.get_nowait()
+                if ev not in ("hover_on", "hover_off"):  # щелчок по иконке — отложенное мини-окно уже не нужно
+                    self._cancel_hover()
                 if isinstance(ev, tuple):  # ("menu", x, y) — правый щелчок по иконке
                     self.show_tray_menu(ev[1], ev[2])
                 elif ev == "toggle":
@@ -202,16 +205,27 @@ class TrayMixin:
                 elif ev == 3:
                     self.quit_app()
                     return
-                elif ev == "hover_on":
-                    if not getattr(self, "tray_menu", None):  # меню иконки открыто — мини-окно не показываем
-                        self.show_popup()
+                elif ev == "hover_on":  # мини-окно — через HOVER_DELAY_MS, если мышь всё ещё на иконке
+                    self._cancel_hover()
+                    self._hover_job = self.root.after(HOVER_DELAY_MS, self._hover_show)
                 elif ev == "hover_off":
+                    self._cancel_hover()
                     self.hide_popup()
         except queue.Empty:
             pass
         if self.app_has_focus():
             self._fg_at = time.time()
         self.root.after(80, self._poll_tray)
+
+    def _cancel_hover(self):
+        job, self._hover_job = getattr(self, "_hover_job", None), None
+        if job:
+            self.root.after_cancel(job)
+
+    def _hover_show(self):
+        self._hover_job = None
+        if not getattr(self, "tray_menu", None):  # меню иконки открыто — мини-окно не показываем
+            self.show_popup()
 
     @staticmethod
     def app_has_focus():
