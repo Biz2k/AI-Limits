@@ -2,11 +2,12 @@
 
 **English** | [Русский](README.ru.md)
 
-A small Windows 11 desktop app that shows how much of your **Claude Code** (Pro subscription) and
-**Google Antigravity** (Gemini models) usage limits you have spent — for several Google accounts at once.
+A small Windows 11 desktop app that shows how much of your **Claude Code** (Pro subscription), **Codex**
+(ChatGPT subscription) and **Google Antigravity** (Gemini models) usage limits you have spent — for several
+Google accounts at once.
 It can also switch the account the Antigravity IDE is signed in to with one click.
 
-> Unofficial project. Not affiliated with Anthropic or Google. The window is available in English, Russian and
+> Unofficial project. Not affiliated with Anthropic, OpenAI or Google. The window is available in English, Russian and
 > Ukrainian (⚙ → Language); the console version is in Russian.
 
 <p>
@@ -17,7 +18,9 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 ## Features
 
 **Limits**
-- Weekly and 5-hour limits for Claude Code and for each Google account, with reset time and countdown.
+- Weekly and 5-hour limits for Claude Code, Codex and each Google account, with reset time and countdown.
+- Codex: the card appears by itself when Codex is signed in with a ChatGPT account (`~/.codex/auth.json`);
+  the app only reads that sign-in and never refreshes it — Codex does that itself.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
 - The account with the most weekly limit left is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
@@ -78,6 +81,7 @@ For running from source:
 - Windows 11
 - Python 3.13 (the Microsoft Store build works)
 - Claude Code installed and signed in (`~/.claude/.credentials.json`) — for the Claude card
+- Codex signed in with a ChatGPT account (`~/.codex/auth.json`) — optional, for the Codex card
 - Antigravity IDE — optional, needed for IDE data and account switching
 - PyInstaller 6.x — only if you want to build the exe
 
@@ -164,8 +168,8 @@ This is not an official mechanism. It may stop working after an IDE update, and 
 
 ## Disclaimer
 
-- The app relies on undocumented endpoints of Anthropic and Google and on the OAuth clients of Claude Code and
-  Antigravity. They can change or be blocked at any time, and using them may be against the services' terms.
+- The app relies on undocumented endpoints of Anthropic, OpenAI and Google and on the OAuth clients of Claude
+  Code and Antigravity (for Codex it uses the sign-in Codex already has). They can change or be blocked at any time, and using them may be against the services' terms.
 - To get both Gemini limits for accounts that are not signed in to the IDE, requests to Google identify the app
   as a recent version of the Antigravity IDE.
 - It reads and writes credentials of the Antigravity IDE on your machine.

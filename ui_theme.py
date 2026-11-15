@@ -19,6 +19,7 @@ YELLOW = "#f2c94c"
 RED = "#ff5c5c"
 CLAUDE = "#d97757"
 GOOGLE = "#5b8def"
+CODEX = "#10a37f"   # зелёный OpenAI
 FONT = "Segoe UI Variable Text" if os.name == "nt" else "Helvetica"
 FONT_D = "Segoe UI Variable Display" if os.name == "nt" else "Helvetica"
 INTERVALS = [("1 мин", 60), ("5 мин", 300), ("15 мин", 900), ("выкл", 0)]

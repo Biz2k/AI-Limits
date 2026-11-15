@@ -91,7 +91,7 @@ def fmt_reset(iso):
 
 
 # ================================================================ вывод
-def render(claude, ag, warn):
+def render(claude, ag, warn, codex=None):
     out = []
     now = dt.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     out.append(bold("AI limits") + dim(f"  ·  {now}  ·  % = израсходовано"))
@@ -106,6 +106,17 @@ def render(claude, ag, warn):
             flag = c("91", "  ⚠") if r["used"] >= warn else ""
             out.append(f"  {r['name']:<22} {bar(r['used'])} {r['used']:5.0f}%  {dim(fmt_reset(r['resets_at']))}{flag}")
     out.append("")
+
+    # --- Codex (подписка ChatGPT; нет входа Codex — раздела нет)
+    if isinstance(codex, Exception):
+        out.append(bold("Codex") + "  " + c("91", f"ошибка: {codex}"))
+        out.append("")
+    elif codex:
+        out.append(bold("Codex") + dim(f"  ·  план {codex['plan']}"))
+        for r in codex["limits"]:
+            flag = c("91", "  ⚠") if r["used"] >= warn else ""
+            out.append(f"  {r['name']:<22} {bar(r['used'])} {r['used']:5.0f}%  {dim(fmt_reset(r['resets_at']))}{flag}")
+        out.append("")
 
     # --- Antigravity
     if not ag:
@@ -145,6 +156,7 @@ def collect(all_models):
     accs = cloud.load_accounts()
     with cf.ThreadPoolExecutor(max_workers=8) as ex:
         fc = ex.submit(cloud.claude_fetch)
+        fx = ex.submit(cloud.codex_fetch) if cloud.codex_installed() else None
         local = ex.submit(ide_local.local_ide_quota).result()
         fa = [(a["email"], ex.submit(cloud.ag_fetch, a, all_models, local)) for a in accs]
 
@@ -160,7 +172,7 @@ def collect(all_models):
             if email not in known:
                 ag.append((email, {"plan": li["plan"], "models": li["rows"], "credits": None,
                                    "source": "данные IDE Antigravity", "ide_only": True}))
-        return res(fc), merge_with_cache(ag)
+        return res(fc), merge_with_cache(ag), (res(fx) if fx else None)
 
 
 # ---------------------------------------------------------------- кэш лимитов
@@ -226,9 +238,9 @@ def merge_with_cache(ag):
     return out
 
 
-def to_jsonable(claude, ag):
+def to_jsonable(claude, ag, codex=None):
     j = lambda r: {"error": str(r)} if isinstance(r, Exception) else r
-    return {"time": dt.datetime.now().astimezone().isoformat(), "claude": j(claude),
+    return {"time": dt.datetime.now().astimezone().isoformat(), "claude": j(claude), "codex": j(codex),
             "antigravity": {e: j(r) for e, r in ag}}
 
 
@@ -315,13 +327,13 @@ def main():
         return
 
     while True:
-        claude, ag = collect(a.all_models)
+        claude, ag, codex = collect(a.all_models)
         if a.json:
-            print(json.dumps(to_jsonable(claude, ag), ensure_ascii=False, indent=2))
+            print(json.dumps(to_jsonable(claude, ag, codex), ensure_ascii=False, indent=2))
         else:
             if a.watch:
                 print("\033[2J\033[H", end="")
-            print(render(claude, ag, a.warn))
+            print(render(claude, ag, a.warn, codex))
         if not a.watch:
             break
         try:

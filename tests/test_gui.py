@@ -25,7 +25,7 @@ storage.APPDIR = tempfile.mkdtemp(prefix="ailimits_gui_")  # история пи
 RESET = history._iso(time.time() + 72 * 3600)
 
 SAVED, SWITCHED, IDE_CALLS = [], [], []
-STATE = {"week_a": 55.0, "ide_account": "a@example.com", "ide_ready_after": 0}
+STATE = {"week_a": 55.0, "ide_account": "a@example.com", "ide_ready_after": 0, "codex": False}
 
 
 def rows(week, five, reset=None):
@@ -44,6 +44,8 @@ G.load_settings = lambda: {"interval": 300, "warn": 80, "geometry": "500x640+120
 G.save_settings = SAVED.append
 L.load_accounts = lambda: [{"email": "a@example.com"}, {"email": "b@example.com"}]
 L.claude_fetch = lambda: {"plan": "pro", "limits": rows(10.0, 2.0)}
+L.codex_installed = lambda: STATE["codex"]  # настоящий вход Codex не читаем; карточку включает отдельный шаг
+L.codex_fetch = lambda: {"plan": "plus", "limits": rows(20.0, 5.0)}
 L.ag_fetch = lambda acc, a=False, l=None: {"plan": "Pro", "models": rows(40.0, 3.0), "credits": None,
                                            "source": "облако"}
 L.merge_with_cache = lambda ag: ag
@@ -408,6 +410,28 @@ def main():
     cmd = autostart.autostart_command()
     assert "--autostart" in cmd and ("limits_gui.pyw" in cmd or getattr(sys, "frozen", False)), cmd
     step("сворачивание карточки сохраняется в настройках; команда автозапуска указывает на окно")
+
+    STATE["codex"] = True
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "codex" in app.cards, "карточка Codex не появилась")
+    card = " ".join(texts(app.cards["codex"].outer))
+    assert "Codex" in card and "PLUS" in card and "20%" in card and "5%" in card, card
+    assert app.card_order == ["claude", "codex", "a@example.com", "b@example.com"], app.card_order  # по умолчанию — за Claude
+    app.s["order"] = ["b@example.com", "claude", "a@example.com"]       # порядок, сохранённый до появления Codex
+    app.render(*app.data)
+    yield wait()
+    assert app.card_order[-1] == "codex", app.card_order                # новая карточка — в конце, как новый аккаунт
+    app.s["order"] = []
+    app.render(*app.data)
+    app.show_popup()
+    yield wait()
+    assert "Codex" in texts(app.popup), texts(app.popup)
+    app.hide_popup()
+    assert history.series("codex", "Неделя", 0), "Codex не пишется в историю"
+    STATE["codex"] = False
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "codex" not in app.cards, "карточка Codex не исчезла")
+    step("карточка Codex: есть вход Codex — есть карточка (неделя, 5 часов, план), мини-окно и история; нет — нет")
 
     print("Все проверки окна пройдены.")
     app.quit_app()

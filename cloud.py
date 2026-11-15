@@ -163,6 +163,54 @@ def claude_fetch():
             "extra_usage": ex.get("is_enabled", False)}
 
 
+# ================================================================ Codex (подписка ChatGPT)
+CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage"  # неофициальный адрес, им пользуется Codex
+
+
+def codex_installed():
+    """Есть ли вход Codex (~/.codex/auth.json) — тогда в окне есть карточка Codex. Быстро, без сети."""
+    return os.path.exists(storage.CODEX_AUTH)
+
+
+def _codex_window(w):
+    """Название окна лимита Codex по его длине: 5 часов или неделя."""
+    secs = w.get("limit_window_seconds") or 0
+    return "Неделя" if secs >= 6 * 86400 else ("5 часов" if 4 * 3600 <= secs <= 6 * 3600 else None)
+
+
+def codex_fetch():
+    """Лимиты Codex аккаунта ChatGPT, под которым вошёл Codex: {"plan", "limits": [неделя, 5 часов]}.
+    Токен только читается: обновляет его сам Codex (живёт около 10 дней), чтобы не сбить ему вход."""
+    if not codex_installed():
+        raise RuntimeError(T("Codex не установлен или в него не входили"))
+    with open(storage.CODEX_AUTH, encoding="utf-8") as f:
+        tokens = (json.load(f).get("tokens") or {})
+    if not tokens.get("access_token"):
+        raise RuntimeError(T("Codex вошёл не через аккаунт ChatGPT — лимитов подписки нет"))
+    try:
+        u = http_json(CODEX_USAGE_URL, headers={
+            "Authorization": "Bearer " + tokens["access_token"],
+            "ChatGPT-Account-Id": tokens.get("account_id") or "",
+            "User-Agent": "codex_cli_rs",
+            "Accept": "application/json",
+        })
+    except RuntimeError as e:
+        if str(e).startswith("HTTP 401"):
+            raise RuntimeError(T("вход Codex устарел — запустите Codex, он обновит его сам")) from None
+        raise
+    rows = []
+    for key in ("secondary_window", "primary_window"):  # неделя сверху, как у Claude
+        w = (u.get("rate_limit") or {}).get(key)
+        name = _codex_window(w) if isinstance(w, dict) else None
+        if name and w.get("used_percent") is not None:
+            reset = w.get("reset_at")
+            rows.append({"name": name, "used": float(w["used_percent"]),
+                         "resets_at": dt.datetime.fromtimestamp(reset, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                         if reset else None})
+    rows.sort(key=lambda r: r["name"] != "Неделя")
+    return {"plan": u.get("plan_type") or "?", "limits": rows}
+
+
 # ================================================================ Antigravity
 def load_accounts():
     """Аккаунты Google с расшифрованными refresh_token. Файл прежней версии (токены открытым текстом)

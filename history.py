@@ -90,11 +90,12 @@ def load(now=None):
     return _series
 
 
-def _points(claude, ag):
+def _points(claude, ag, codex=None):
     """Свежие значения из данных окна: [(ключ, окно, %, время сброса ISO)]."""
     out = []
-    if isinstance(claude, dict):
-        out += [("claude", r["name"], r["used"], r.get("resets_at")) for r in claude.get("limits", [])]
+    for key, res in (("claude", claude), ("codex", codex)):
+        if isinstance(res, dict):
+            out += [(key, r["name"], r["used"], r.get("resets_at")) for r in res.get("limits", [])]
     for email, res in ag or []:
         if isinstance(res, dict):
             out += [(email.lower(), m["name"], m["used"], m.get("resets_at")) for m in res.get("models", [])
@@ -102,12 +103,12 @@ def _points(claude, ag):
     return out
 
 
-def record(claude, ag, now=None):
+def record(claude, ag, now=None, codex=None):
     """Дописывает в историю текущие значения. Возвращает число записанных строк."""
     now = now or _now()
     data = load(now)
     rows = []
-    for key, win, used, resets in _points(claude, ag):
+    for key, win, used, resets in _points(claude, ag, codex):
         pts = data.setdefault((key, win), [])
         rs = _ts(resets)
         if pts:
@@ -193,10 +194,10 @@ def forecast(key, window, used, resets_at, now=None):
             "line": T("хватит на {span}, до {when}", span=duration(left), when=when) if before else None}
 
 
-def forecasts(claude, ag, now=None):
+def forecasts(claude, ag, now=None, codex=None):
     """Прогнозы для всех свежих значений: {(ключ, окно): прогноз}; ключ аккаунта — email в нижнем регистре."""
     out = {}
-    for key, win, used, resets in _points(claude, ag):
+    for key, win, used, resets in _points(claude, ag, codex):
         fc = forecast(key, win, used, resets, now)
         if fc:
             out[(key, win)] = fc
