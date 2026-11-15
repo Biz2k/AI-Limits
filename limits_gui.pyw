@@ -451,13 +451,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin):
                 msg=None if models else (T("Нет данных о лимитах Gemini"), MUTED, (FONT, 10), (8, 0)),
                 rows=[] if folded else [(m["name"], m["used"], m["resets_at"], m.get("seen")) for m in models])))
 
-        if self.footer is None:  # «макс. email → 100%» — справа в строке статуса
+        if self.footer is None:  # «макс. email 100%» — справа в строке статуса
             self.footer = tk.Frame(self.status_row, bg=BG)
             self._footer_on = False
             tk.Label(self.footer, text=T("макс."), bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 5))
             self.footer_email = tk.Label(self.footer, bg=BG, fg=GOOGLE, font=(FONT, 9))
             self.footer_email.pack(side="left", padx=(0, 5))
-            tk.Label(self.footer, text="→", bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 5))
             self.footer_pct = tk.Label(self.footer, bg=BG, fg=GREEN, font=(FONT, 10, "bold"))
             self.footer_pct.pack(side="left")
 

@@ -19,7 +19,7 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 **Limits**
 - Weekly and 5-hour limits for Claude Code and for each Google account, with reset time and countdown.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
-- The account with the most weekly limit left is shown at the top right ("max … → 100%").
+- The account with the most weekly limit left is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace.
 
