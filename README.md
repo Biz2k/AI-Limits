@@ -25,7 +25,7 @@ It can also switch the account the Antigravity IDE is signed in to with one clic
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace. Pop-up forecast warnings are off by default (⚙ → Forecast warnings).
 - Auto refresh (1 / 5 / 15 min), always-on-top, collapsible cards. Cards update in place without flicker.
-- Drag a card by its header to reorder; the tray window and the account list in the menu follow the same order.
+- Drag a card by the colored strip on its left to reorder (the other cards slide aside); the tray window and the account list in the menu follow the same order.
   Cards can be laid out in two columns (⚙ → Cards in two columns).
 - Console version with plain-text and JSON output.
 - Version shown in the settings menu and in the exe properties; unhandled errors are written to a log file.
