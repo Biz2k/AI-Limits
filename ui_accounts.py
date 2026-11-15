@@ -183,7 +183,9 @@ class AccountsMixin:
         """Добавить аккаунт: Google — вход в браузере; Claude и ChatGPT — вход самой программы в окне консоли
         в отдельную папку профиля. Совпал с аккаунтом программы — плитка программы получает его имя."""
         if getattr(self, "adding", False):
-            return
+            self.cancel_add()  # предыдущий незавершённый вход — отменить, начать новый
+        self._add_token = token = getattr(self, "_add_token", 0) + 1
+        p = None
         if kind == "google":
             self.say(T("Войдите в Google в открывшемся браузере…"), GOOGLE)
         else:
@@ -192,9 +194,10 @@ class AccountsMixin:
             except Exception as e:
                 self.notify(str(e), RED, hold=20)
                 return
-            self.say(T("Войдите в окне Claude Code — откроется браузер…") if kind == "claude"
-                     else T("Войдите в окне Codex — откроется браузер…"), ACCENT[kind])
-        self.adding = True
+            self.say(T("Войдите в аккаунт Claude в открывшемся браузере…") if kind == "claude"
+                     else T("Войдите в аккаунт ChatGPT в открывшемся браузере…"), ACCENT[kind])
+        self.adding, self._add_profile = True, p
+        self._show_cancel(True)
 
         def work():
             try:
@@ -207,7 +210,10 @@ class AccountsMixin:
                 ident = A.ident(kind, email)
 
                 def done():
+                    if token != self._add_token:  # этот вход уже отменён и заменён новым
+                        return
                     self.adding = False
+                    self._show_cancel(False)
                     names = self.names()
                     if ident not in names:
                         names[ident] = A.suggest_name(kind, email, self.taken_names(ident))
@@ -224,10 +230,35 @@ class AccountsMixin:
                 failed = T("Вход не выполнен: {error}", error=e)  # текст — сейчас: вне except имени e уже нет
 
                 def fail():
+                    if token != self._add_token:
+                        return
                     self.adding = False
+                    self._show_cancel(False)
                     self.notify(failed, RED, hold=20)
                 self.root.after(0, fail)
         threading.Thread(target=work, daemon=True).start()
+
+    def cancel_add(self):
+        """Отменить незавершённый вход (ссылка «Отменить» в строке статуса или новый «Добавить аккаунт»)."""
+        if getattr(self, "_add_profile", None):
+            A.cancel_login(self._add_profile)
+        self._add_token = getattr(self, "_add_token", 0) + 1
+        self.adding, self._add_profile = False, None
+        self._show_cancel(False)
+        self.notify(T("Вход отменён"), MUTED, hold=5)
+
+    def _show_cancel(self, on):
+        """Ссылка «Отменить» справа в строке статуса, пока идёт вход в аккаунт."""
+        lbl = getattr(self, "cancel_lbl", None)
+        if lbl is None:
+            lbl = self.cancel_lbl = tk.Label(self.status_row, text=T("Отменить"), bg=self.status.cget("bg"), fg=MUTED,
+                                             font=(FONT, 9, "underline"), cursor="hand2")
+            lbl.bind("<Button-1>", lambda e: self.cancel_add())
+        if on:
+            lbl.config(text=T("Отменить"))
+            lbl.pack(side="right", before=self.status)
+        else:
+            lbl.pack_forget()
 
     def remove_account(self, ident, anchor=None):
         """Удалить добавленный аккаунт (и папку его профиля) и его имя."""

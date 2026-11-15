@@ -438,9 +438,23 @@ def test_accounts():
     assert not os.path.exists(os.path.join(accounts.profiles_dir(), "chatgpt-dup"))
     empty = {"kind": "claude", "dir": "claude-empty"}
     os.makedirs(os.path.join(accounts.profiles_dir(), empty["dir"]), exist_ok=True)
-    assert "не выполнен" in expect_error(RuntimeError, lambda: accounts.finish_login(empty, timeout=0))
+    assert "время ожидания" in expect_error(RuntimeError, lambda: accounts.finish_login(empty, timeout=0))
     assert not os.path.exists(os.path.join(accounts.profiles_dir(), "claude-empty"))
-    step("профиль: вход программы шифруется, открытая копия удаляется; повтор и несостоявшийся вход не сохраняются")
+    # вход идёт без окна; отмена останавливает программу входа и убирает папку; программа завершилась без входа —
+    # в сообщении её последняя строка (без адресов)
+    import subprocess as sp
+    slow = {"kind": "chatgpt", "dir": "chatgpt-slow", "_out": [],
+            "_proc": sp.Popen([sys.executable, "-c", "import time; time.sleep(30)"], creationflags=0x08000000)}
+    os.makedirs(os.path.join(accounts.profiles_dir(), slow["dir"]), exist_ok=True)
+    accounts.cancel_login(slow)
+    assert "отменено" in expect_error(RuntimeError, lambda: accounts.finish_login(slow, timeout=20))
+    assert slow["_proc"].poll() is not None and not os.path.exists(os.path.join(accounts.profiles_dir(), "chatgpt-slow"))
+    quit_ = {"kind": "claude", "dir": "claude-quit", "_out": ["Opening browser", "https://x/authorize?a", "Login failed: denied"],
+             "_proc": sp.Popen([sys.executable, "-c", "pass"], creationflags=0x08000000)}
+    os.makedirs(os.path.join(accounts.profiles_dir(), quit_["dir"]), exist_ok=True)
+    assert expect_error(RuntimeError, lambda: accounts.finish_login(quit_, timeout=20)) == "Login failed: denied"
+    step("профиль: вход программы шифруется, открытая копия удаляется; повтор, отмена и несостоявшийся вход"
+         " не сохраняются, причина — понятная")
 
     # лимиты по профилю: просроченные токены обновляет AI Limits и сохраняет зашифрованными
     calls = []

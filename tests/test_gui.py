@@ -507,6 +507,27 @@ def main():
         p["email"] = {"chatgpt": "cx@example.com", "claude": "second@example.com"}[p["kind"]]
         return p
     accounts.start_login, accounts.finish_login = fake_start, fake_finish
+    real_finish = fake_finish
+
+    def waiting_finish(p, **k):  # вход в браузере ещё не завершён — ждём отмены
+        for _ in range(100):
+            if p.get("_cancel"):
+                raise RuntimeError("отменено")
+            time.sleep(0.05)
+        return real_finish(p)
+    accounts.finish_login = waiting_finish
+    app.add_account("chatgpt")
+    yield wait()
+    assert app.adding and app.cancel_lbl.winfo_ismapped() and "браузере" in app.status.cget("text")
+    app.add_account("claude")                                            # новый вход отменяет незавершённый
+    yield wait()
+    assert app.adding and app._add_profile["kind"] == "claude"
+    app.cancel_lbl.event_generate("<Button-1>")                         # «Отменить» в строке статуса
+    yield wait(1)
+    assert not app.adding and not app.cancel_lbl.winfo_ismapped() and app.status.cget("text") == "Вход отменён"
+    assert len(accounts.load_profiles()) == 0
+    accounts.finish_login = real_finish
+    step("вход без окна консоли: «Отменить» в строке статуса, новый «Добавить аккаунт» отменяет незавершённый")
     app.add_account("chatgpt")
     yield wait(10, lambda: not app.adding and not app.loading and "codex" in app.cards, "ChatGPT не добавился")
     assert app.names()["codex:cx@example.com"] == "cx" and app.tile_info["codex"]["title"] == "cx"

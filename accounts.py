@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 
@@ -159,7 +160,9 @@ def find_cli(kind):
 
 
 def start_login(kind):
-    """Создаёт папку нового профиля и открывает окно консоли со входом программы. Возвращает профиль (dict)."""
+    """Создаёт папку нового профиля и запускает вход программы **без окна консоли**: программа сама открывает
+    страницу входа в браузере по умолчанию и ждёт ответа на localhost. Вывод программы собирается в p["_out"]
+    (для сообщения об ошибке). Возвращает профиль (dict)."""
     cli = find_cli(kind)
     if not cli:
         raise RuntimeError(T("Не найден Claude Code (claude.exe) — установите его") if kind == "claude"
@@ -174,8 +177,28 @@ def start_login(kind):
     else:
         env["CODEX_HOME"] = home
         args = [cli, "login"]
-    p["_proc"] = subprocess.Popen(args, env=env, cwd=home, creationflags=0x00000010)  # CREATE_NEW_CONSOLE
+    proc = subprocess.Popen(args, env=env, cwd=home, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, creationflags=0x08000000)  # CREATE_NO_WINDOW
+    p["_proc"], p["_out"] = proc, []
+    threading.Thread(target=lambda: p["_out"].extend(
+        line.decode("utf-8", errors="replace").strip() for line in iter(proc.stdout.readline, b"")), daemon=True).start()
     return p
+
+
+def cancel_login(p):
+    """Отменить незавершённый вход: остановить программу и убрать папку профиля."""
+    p["_cancel"] = True
+    proc = p.get("_proc")
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+
+
+def _login_error(p):
+    """Почему программа завершилась без входа: последняя содержательная строка её вывода (без адресов)."""
+    for line in reversed(p.get("_out") or []):
+        if line and "http" not in line and len(line) < 200:
+            return line
+    return T("программа входа завершилась без входа")
 
 
 def _claude_status(p):
@@ -187,9 +210,11 @@ def _claude_status(p):
     return json.loads(out.decode("utf-8", errors="replace") or "{}")
 
 
-def finish_login(p, timeout=LOGIN_TIMEOUT, cancelled=lambda: False):
+def finish_login(p, timeout=LOGIN_TIMEOUT, cancelled=None):
     """Ждёт, пока программа запишет вход в папку профиля; затем шифрует его и заполняет email.
-    Возвращает профиль без служебных полей. Окно входа закрыли или время вышло — RuntimeError."""
+    Возвращает профиль без служебных полей. Вход отменён, программа завершилась без входа или время вышло —
+    RuntimeError с понятной причиной."""
+    cancelled = cancelled or (lambda: p.get("_cancel"))
     home = os.path.join(profiles_dir(), p["dir"])
     src = os.path.join(home, ".credentials.json" if p["kind"] == "claude" else "auth.json")
     deadline = time.time() + timeout
@@ -205,13 +230,15 @@ def finish_login(p, timeout=LOGIN_TIMEOUT, cancelled=lambda: False):
                        else ((data.get("tokens") or {}).get("access_token")))
         if ok:
             break
-        if proc is not None and proc.poll() is not None:  # окно входа закрыто — даём файлу 5 с появиться
+        if proc is not None and proc.poll() is not None:  # программа входа завершилась — даём файлу 5 с появиться
             exited_at = exited_at or time.time()
-        if cancelled() or time.time() > deadline or (exited_at and time.time() - exited_at > 5):
+        reason = (T("отменено") if cancelled() else T("время ожидания вышло") if time.time() > deadline
+                  else _login_error(p) if exited_at and time.time() - exited_at > 5 else None)
+        if reason:
             if proc is not None and proc.poll() is None:
                 proc.kill()
             shutil.rmtree(home, ignore_errors=True)
-            raise RuntimeError(T("Вход не выполнен"))
+            raise RuntimeError(reason)
         time.sleep(1)
     if p["kind"] == "claude":
         st = {}
