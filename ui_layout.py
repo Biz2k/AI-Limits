@@ -23,7 +23,7 @@ class LayoutMixin:
         return 2 if self.s.get("two_columns") else 1
 
     def layout_cards(self):
-        """Раскладывает карточки по self.card_order в одну или две колонки; строка «Максимум» — под ними."""
+        """Раскладывает карточки по self.card_order в одну или две колонки."""
         if getattr(self, "_dnd", None):  # идёт перетаскивание — сетку вернёт его окончание
             return
         cols = self.columns()
@@ -33,12 +33,6 @@ class LayoutMixin:
             col = i % cols
             padx = (20, 20) if cols == 1 else ((20, 6) if col == 0 else (6, 20))
             self.cards[k].outer.grid(row=i // cols, column=col, sticky="nsew", padx=padx, pady=6)
-        if self.footer is not None:
-            if self._footer_on:
-                self.footer.grid(row=(len(self.card_order) + cols - 1) // cols, column=0, columnspan=cols,
-                                 sticky="we", padx=22, pady=(8, 4))
-            else:
-                self.footer.grid_forget()
 
     def toggle_two_columns(self):
         """Галочка «Карточки в две колонки»: окно расширяется (или сужается) под новое число колонок."""
@@ -53,7 +47,7 @@ class LayoutMixin:
         self.persist()
 
     # ------------------------------------------------ перетаскивание
-    # Пока плитку тащат, все плитки (и строка «Максимум») размещаются place() по координатам: перетаскиваемая
+    # Пока плитку тащат, все плитки размещаются place() по координатам: перетаскиваемая
     # едет за мышью поверх остальных, остальные плавно (ANIM_MS) съезжают на свои новые места. После отпускания
     # плитка доезжает до своего места, и раскладка возвращается в сетку (layout_cards).
     def bind_drag(self, card, handle):
@@ -90,8 +84,6 @@ class LayoutMixin:
         self.cv.itemconfig(self.body_id, height=self.body.winfo_height())  # высота body не меняется, пока тащат
         self._dnd = {"anim": {}, "pos": {}, "drop": False}
         widgets = [(k, self.cards[k].outer) for k in self.card_order]
-        if self.footer is not None and self._footer_on:
-            widgets.append(("\0footer", self.footer))
         geo = {k: (w.winfo_x(), w.winfo_y(), w.winfo_width(), w.winfo_height()) for k, w in widgets}
         for k, w in widgets:
             x, y, ww, hh = geo[k]
@@ -190,8 +182,6 @@ class LayoutMixin:
         self._dnd = None
         for k in self.card_order:
             self.cards[k].outer.place_forget()
-        if self.footer is not None:
-            self.footer.place_forget()
         self.layout_cards()
         self.cv.itemconfig(self.body_id, height=0)  # высота body снова по содержимому
         card.frame.config(highlightbackground=LINE)

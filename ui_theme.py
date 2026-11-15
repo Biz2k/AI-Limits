@@ -70,9 +70,12 @@ class Tooltip:
         x, y = self.w.winfo_rootx() + 10, self.w.winfo_rooty() + self.w.winfo_height() + 4
         self.tip = tk.Toplevel(self.w)
         self.tip.wm_overrideredirect(True)
-        self.tip.wm_geometry(f"+{x}+{y}")
         tk.Label(self.tip, text=self.text, bg="#2a2f3a", fg=FG, font=(FONT, 9),
                  padx=8, pady=4).pack()
+        self.tip.update_idletasks()
+        top = self.w.winfo_toplevel()  # не выходить за правый край окна, в котором элемент
+        x = max(top.winfo_rootx() + 4, min(x, top.winfo_rootx() + top.winfo_width() - self.tip.winfo_reqwidth() - 4))
+        self.tip.wm_geometry(f"+{x}+{y}")
 
     def hide(self, _):
         if self.tip:

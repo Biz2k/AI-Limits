@@ -194,9 +194,9 @@ def main():
     def seen():
         return " | ".join(texts(root)) + " | " + app.status.cget("text")
     cards = len(app.cards)
-    for code, words in (("en", ("Refresh", "Week", "5 hours", "Maximum", "Updated", "auto 5 min", "→ to IDE")),
-                        ("uk", ("Оновити", "Тиждень", "5 годин", "Оновлено", "авто 5 хв", "→ в IDE")),
-                        ("ru", ("Обновить", "Неделя", "5 часов", "Обновлено", "авто 5 мин"))):
+    for code, words in (("en", ("Refresh", "Week", "5 hours", "max", "Updated", "→ to IDE")),
+                        ("uk", ("Оновити", "Тиждень", "5 годин", "макс.", "Оновлено", "→ в IDE")),
+                        ("ru", ("Обновить", "Неделя", "5 часов", "макс.", "Обновлено"))):
         app.set_lang(code)
         yield wait()
         text = seen()
@@ -326,6 +326,50 @@ def main():
     cl.title.event_generate("<ButtonRelease-1>")
     yield wait()
     assert "claude" in app.collapsed and SAVED and "claude" in SAVED[-1]["collapsed"]
+    assert cl.summary.cget("text") == "90%", cl.summary.cget("text")    # свёрнутая: остаток недели, без «макс»
+    app.toggle("b@example.com")
+    yield wait()
+    week_b = next(m["used"] for m in app.ag_res["b@example.com"]["models"] if m["name"] == "Неделя")
+    assert cb.summary.cget("text") == f"{100 - week_b:.0f}%", (cb.summary.cget("text"), week_b)
+    cb.full_title = "very-long-address-for-a-narrow-card@example.com"
+    cb.fit_title()
+    yield wait()
+    assert cb.title.cget("text").endswith("…") and cb.head.winfo_reqwidth() <= cb.head.winfo_width() + 2,         (cb.title.cget("text"), cb.head.winfo_reqwidth(), cb.head.winfo_width())  # «→ в IDE» не обрезается
+    cb.full_title = "b@example.com"
+    app.toggle("b@example.com")
+    app.toggle("claude")
+    yield wait()
+    step("свёрнутая плитка: остаток недельного лимита без «макс»; длинный email укорачивается, кнопка видна")
+
+    status = app.status.cget("text")
+    assert status.startswith("Обновлено") and "авто" not in status, status
+    assert app.footer.master is app.status_row and app.footer.winfo_ismapped()
+    assert app.footer.winfo_rootx() > app.status.winfo_rootx()          # «макс.» — справа в строке статуса
+    labels = app.footer.winfo_children()
+    assert labels[0].cget("text") == "макс." and "bold" not in str(labels[1].cget("font"))
+    assert "bold" in str(labels[-1].cget("font")) and labels[-1].cget("text").endswith("%")
+    step("строка статуса: «Обновлено ЧЧ:ММ» без автообновления, справа «макс. email → N%»")
+
+    tip = cb.ide_tip                                                    # «Сделать этот аккаунт текущим в IDE…»
+    tip.show(None)
+    yield wait()
+    right = root.winfo_rootx() + root.winfo_width()
+    assert tip.tip.winfo_rootx() + tip.tip.winfo_width() <= right, (tip.tip.winfo_rootx(), tip.tip.winfo_width(), right)
+    tip.hide(None)
+    step("всплывающая подсказка не выходит за правый край окна")
+
+    if app.tray:
+        app._fg_at = time.time()                                        # окно в фокусе -> щелчок по иконке прячет
+        app.q.put("toggle")
+        yield wait(1, lambda: root.state() == "withdrawn", "окно не ушло в трей")
+        app.q.put("toggle")                                             # в трее -> показать
+        yield wait(1, lambda: root.state() == "normal", "окно не показалось")
+        app._fg_at = 0                                                  # открыто, но не в фокусе -> только фокус
+        root.after(0, lambda: None)
+        app.q.put("toggle")
+        yield wait(0.4)
+        assert root.state() == "normal"
+        step("щелчок по иконке трея: окно в фокусе — в трей, иначе — показать и дать фокус")
     cmd = autostart.autostart_command()
     assert "--autostart" in cmd and ("limits_gui.pyw" in cmd or getattr(sys, "frozen", False)), cmd
     step("сворачивание карточки сохраняется в настройках; команда автозапуска указывает на окно")

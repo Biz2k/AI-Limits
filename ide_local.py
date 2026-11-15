@@ -204,9 +204,24 @@ def _ide_exe_standard():
     return None
 
 
+def find_cli_executable():
+    """Путь к agy.exe — консольной версии Antigravity (если IDE не установлена, запускается она)."""
+    import shutil
+    for p in (shutil.which("agy"), os.path.join(os.environ.get("LOCALAPPDATA", ""), "agy", "bin", "agy.exe")):
+        if p and os.path.exists(p):
+            return p
+    return None
+
+
+def start_cli(exe_path):
+    """Запускает agy.exe в новом окне консоли."""
+    import subprocess
+    return subprocess.Popen([exe_path], creationflags=0x00000010, close_fds=True)  # CREATE_NEW_CONSOLE
+
+
 def ide_installed():
-    """Быстрая проверка для интерфейса: известен ли путь к Antigravity.exe (PowerShell не запускает)."""
-    return _IDE_EXE or _ide_exe_standard()
+    """Быстрая проверка для интерфейса: известен ли путь к Antigravity.exe или agy.exe (PowerShell не запускает)."""
+    return _IDE_EXE or _ide_exe_standard() or find_cli_executable()
 
 
 def find_ide_executable():

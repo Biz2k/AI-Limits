@@ -1,5 +1,6 @@
 """Карточки лимитов: создаются один раз, при обновлении меняются только изменившиеся значения."""
 import tkinter as tk
+import tkinter.font as tkfont
 
 from i18n import T
 from ui_theme import (
@@ -113,14 +114,17 @@ class CardView:
         h = tk.Frame(inner, bg=CARD)
         h.pack(fill="x")
         h.columnconfigure(3, weight=1)
+        self.head = h
+        h.bind("<Configure>", lambda e: self.fit_title())
         self.arrow = tk.Label(h, text="▾", bg=CARD, fg=MUTED, font=(FONT, 11))
         self.arrow.grid(row=0, column=0, padx=(0, 6))
+        self.full_title = title
         self.title = tk.Label(h, text=title, bg=CARD, fg=FG, font=(FONT, 12, "bold"))
         self.title.grid(row=0, column=1)
         self.badge = tk.Label(h, bg=CARD_HI, fg=accent, font=(FONT, 8, "bold"), padx=7, pady=1)
         self.badge.grid(row=0, column=2, padx=8)
         self.summary = tk.Label(h, bg=CARD, font=(FONT, 10, "bold"))
-        self.summary.grid(row=0, column=4)
+        self.summary.grid(row=0, column=4, padx=(0, 8))
         self.ide = tk.Label(h, bg=CARD)
         self.ide.grid(row=0, column=5, padx=(0, 10))
         self.ide.bind("<Button-1>", lambda e: self.ide_mode == "switch" and app.switch_ide(key))
@@ -135,6 +139,21 @@ class CardView:
         self.rows_box.pack(fill="x")
         for w in (self.arrow, self.badge, self.summary, self.ide):
             _vis(w, False)
+
+    def fit_title(self):
+        """Длинный email в заголовке укорачивается «…», чтобы значок, остаток и «→ в IDE» не обрезались."""
+        width = self.head.winfo_width()
+        if width <= 1:
+            return
+        pads = {self.arrow: 6, self.badge: 16, self.summary: 8, self.ide: 10}
+        room = width - sum(w.winfo_reqwidth() + pad for w, pad in pads.items() if getattr(w, "_on", True)) - 8
+        font = tkfont.Font(font=self.title.cget("font"))
+        text = self.full_title
+        if font.measure(text) > room:
+            while len(text) > 4 and font.measure(text + "…") > room:
+                text = text[:-1]
+            text += "…"
+        _set(self.title, text=text)
 
     def strip_hover(self, on):
         """Подсветка полоски: светлее при наведении и пока плитку тащат."""
@@ -191,3 +210,4 @@ class CardView:
                 self.content.pack(fill="x")
             else:
                 self.content.pack_forget()
+        self.head.after_idle(self.fit_title)
