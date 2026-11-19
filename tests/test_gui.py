@@ -172,7 +172,10 @@ def main():
     assert win is not None and any("раньше сброса" in t for t in texts(win))
     yield wait(0.3)
     assert float(win.attributes("-alpha")) > 0.99                       # график проявился плавно и до конца
-    assert any(isinstance(c, tk.Canvas) and c.find_all() for c in win.winfo_children()[0].winfo_children())
+    cvs = [c for c in win.winfo_children()[0].winfo_children() if isinstance(c, tk.Canvas) and c.find_all()]
+    assert cvs
+    lines = [i for i in cvs[0].find_all() if cvs[0].type(i) == "line" and cvs[0].itemcget(i, "fill") == G.BLUE]
+    assert lines and {float(cvs[0].itemcget(i, "width")) for i in lines} == {max(1, round(app.root.winfo_fpixels("1i") / 96))}
     win.event_generate("<Escape>")
     yield wait()
     assert app.confirm_win is None
@@ -584,9 +587,19 @@ def main():
 
     # удаление: профиль и его папка, имя; аккаунт программы удалить нельзя
     prof = next(p for p in accounts.load_profiles() if p["kind"] == "claude")
-    app.remove_account("claude:second@example.com")
+    app.show_accounts()
     yield wait()
-    app.confirm_win.event_generate("<Return>")
+    cx, cy = root.winfo_rootx() + root.winfo_width() // 2, root.winfo_rooty() + 120
+    root.winfo_pointerxy = lambda: (cx, cy)                             # указатель — над окном
+    app.remove_account("claude:second@example.com", anchor=app.menu_win.winfo_children()[0])  # ✕ в меню
+    yield wait()
+    cw = app.confirm_win
+    del root.winfo_pointerxy
+    wx, wy, ww, wh = cw.winfo_rootx(), cw.winfo_rooty(), cw.winfo_width(), cw.winfo_height()
+    assert root.winfo_rootx() <= wx and wx + ww <= root.winfo_rootx() + root.winfo_width(), (wx, ww)
+    assert root.winfo_rooty() <= wy and wy + wh <= root.winfo_rooty() + root.winfo_height(), (wy, wh)
+    assert wy >= cy + 20 or wy + wh <= cy - 20, (wy, wh, cy)               # рядом с указателем, но не вплотную
+    cw.event_generate("<Return>")
     yield wait(10, lambda: not app.loading and "claude:second@example.com" not in app.cards, "аккаунт не удалился")
     assert not os.path.exists(os.path.join(accounts.profiles_dir(), prof["dir"]))
     assert "claude:second@example.com" not in app.names()
