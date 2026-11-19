@@ -10,6 +10,7 @@ import time
 import tkinter as tk
 
 import accounts as A
+import codex_switch as CX
 import history as H
 import limits as L
 from i18n import T
@@ -280,6 +281,56 @@ class AccountsMixin:
             lbl.pack(side="right", before=self.status)
         else:
             lbl.pack_forget()
+
+    # ------------------------------------------------ смена аккаунта программы (кнопки «→ в IDE», «→ в Codex»)
+    def switch_mode(self, t, ide_running):
+        """Метка или кнопка плитки: "current"/"switch" (IDE Antigravity), "current_codex"/"switch_codex" (Codex)."""
+        if t["kind"] == "google":
+            return "current" if t["ide"] else ("switch" if ide_running or L.ide_installed() else None)
+        if t["kind"] == "chatgpt":
+            if t["ide"]:
+                return "current_codex"
+            return "switch_codex" if t.get("profile") and self.has_prog.get("chatgpt") else None
+        return "current" if t["ide"] else None  # Claude: кнопки «→ в Claude» пока нет
+
+    def switch_codex(self, key):
+        if getattr(self, "codex_switching", False):
+            return
+        t, card = getattr(self, "tile_info", {}).get(key), self.cards.get(key)
+        if not t or not t.get("profile"):
+            return
+        self.confirm(card.ide if card else self.menu_btn,
+                     T("Переключить Codex на {email}?", email=t["email"]),
+                     T("Приложение Codex перезапустится, незавершённые ответы прервутся. Прежний вход "
+                       "сохранится в AI Limits — на него можно вернуться."),
+                     lambda: self._switch_codex_go(t["profile"]))
+
+    def _switch_codex_go(self, profile):
+        self.codex_switching = True
+        self.say(T("Codex: подготовка…"), CODEX)
+
+        def work():
+            try:
+                r = CX.switch(profile, on_status=lambda s: self.root.after(0, lambda: self.say(s, CODEX)))
+                failed = None
+            except Exception as e:
+                r, failed = None, T("Не удалось сменить аккаунт Codex: {error}", error=e)
+
+            def done():
+                self.codex_switching = False
+                if failed:
+                    self.notify(failed, RED, hold=20)
+                    return
+                kept = r.get("kept")
+                if r.get("created") and kept:
+                    ident = A.ident("chatgpt", kept["email"])
+                    if ident not in self.names():
+                        self.names()[ident] = A.suggest_name("chatgpt", kept["email"], self.taken_names(ident))
+                        self.persist()
+                self.notify(T("Codex теперь работает под {email}", email=r["email"]), GREEN)
+                self.refresh()
+            self.root.after(0, done)
+        threading.Thread(target=work, daemon=True).start()
 
     def remove_account(self, ident, anchor=None):
         """Удалить добавленный аккаунт (и папку его профиля) и его имя."""

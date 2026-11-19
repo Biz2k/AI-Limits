@@ -32,8 +32,8 @@ switch the account the Antigravity IDE is signed in to with one click.
 **Limits**
 - Weekly and 5-hour limits for Claude Code, Codex (ChatGPT subscription) and each Google account (Gemini), with
   reset time and countdown.
-- The app's own sign-ins of Claude Code and Codex are only read; the tokens of the profiles AI Limits signed in
-  itself are kept encrypted and refreshed by AI Limits.
+- The app's own sign-ins of Claude Code and Codex are only read (Codex's is replaced only when you press
+  "→ to Codex"); the tokens of the profiles AI Limits signed in itself are kept encrypted and refreshed by AI Limits.
 - The limits of a closed Antigravity IDE come from the cloud using the IDE's own saved sign-in.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
 - The account with the most weekly limit left, of any service, is shown at the top right ("max … 100%").
@@ -45,6 +45,11 @@ switch the account the Antigravity IDE is signed in to with one click.
   (the IDE is restarted; the previous credentials are backed up and restored if the switch fails).
 - Works when the IDE is closed too: it starts the IDE (or the `agy` CLI if the IDE is not installed) and skips the
   switch when the IDE is already signed in to that account.
+
+**Codex account**
+- **"→ to Codex" button** on added ChatGPT accounts: makes Codex use that account. The Codex app is closed and
+  started again; the current Codex sign-in is backed up and kept in AI Limits as an account you can switch back to
+  (added automatically if it was not). Codex running in a terminal is not closed — you are asked to close it.
 
 **Window**
 - Cards can be collapsed (a collapsed card shows how much of its weekly limit is left), reordered by dragging the
@@ -168,6 +173,7 @@ Everything lives in `%APPDATA%\ai-limits\`:
 | `history.csv` | limit values over time, kept for 60 days (no tokens) |
 | `ide_backups\` | copies of the IDE credentials taken before each account switch (last 5, encrypted) |
 | `ide_switch.log` | account switch log (tokens are masked) |
+| `codex_backups\` | copies of the Codex sign-in taken before each "→ to Codex" (last 5, encrypted) |
 | `app.log` | unhandled errors with the app version (token-like strings are masked) |
 
 Tokens, keys and the credential copies are encrypted with Windows DPAPI: only your Windows account on this
