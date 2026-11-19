@@ -21,6 +21,7 @@ import history  # noqa: E402
 import i18n  # noqa: E402
 import storage  # noqa: E402
 import tempfile  # noqa: E402
+import ui_accounts  # noqa: E402
 
 storage.APPDIR = tempfile.mkdtemp(prefix="ailimits_gui_")  # история пишется во временную папку
 RESET = history._iso(time.time() + 72 * 3600)
@@ -175,7 +176,12 @@ def main():
     cvs = [c for c in win.winfo_children()[0].winfo_children() if isinstance(c, tk.Canvas) and c.find_all()]
     assert cvs
     lines = [i for i in cvs[0].find_all() if cvs[0].type(i) == "line" and cvs[0].itemcget(i, "fill") == G.BLUE]
-    assert lines and {float(cvs[0].itemcget(i, "width")) for i in lines} == {max(1, round(app.root.winfo_fpixels("1i") / 96))}
+    wd = max(2, round(2 * app.root.winfo_fpixels("1i") / 96))
+    assert lines and {float(cvs[0].itemcget(i, "width")) for i in lines} <= {wd, wd / 2}
+    for i in lines:  # тонкие линии — только вертикальные спуски; горизонтальных на нуле нет
+        c = cvs[0].coords(i)
+        if float(cvs[0].itemcget(i, "width")) == wd / 2:
+            assert len(c) == 4 and c[0] == c[2], c
     win.event_generate("<Escape>")
     yield wait()
     assert app.confirm_win is None
@@ -584,6 +590,38 @@ def main():
     assert accounts.suggest_name("chatgpt", "b@example.com", list(app.names().values())) == "Codex b"
     step("«Добавить аккаунт»: совпавший с программой — имя у плитки программы; другой — своя плитка;"
          " повтор не добавляется; занятое имя — с приставкой сервиса")
+
+    # «→ в Codex»: у добавленного аккаунта ChatGPT, в который Codex не вошёл, — кнопка того же вида, что «→ в IDE»
+    other = {"kind": "chatgpt", "dir": "chatgpt-other", "email": "cx2@example.com", "account_id": "acc-cx2"}
+    os.makedirs(os.path.join(accounts.profiles_dir(), other["dir"]), exist_ok=True)
+    accounts.save_profiles(accounts.load_profiles() + [other])
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "codex:cx2@example.com" in app.cards, "нет плитки второго ChatGPT")
+    c2 = app.cards["codex:cx2@example.com"]
+    assert c2.ide_mode == "switch_codex" and c2.ide.cget("text") == "→ в Codex", (c2.ide_mode, c2.ide.cget("text"))
+    assert app.cards["codex:cx@example.com"].ide_mode == "current_codex"
+    assert app.cards["codex:cx@example.com"].ide.cget("text") == "● IDE"
+    assert c2.ide.cget("bg") == app.cards["a@example.com"].ide.cget("bg")  # одного вида с «→ в IDE»
+    switched = []
+    real_switch = ui_accounts.CX.switch
+
+    def fake_switch(p, on_status=None):
+        switched.append(p["email"])
+        on_status("Codex: закрываю приложение…")
+        return {"email": p["email"], "kept": None, "created": False, "restarted": True}
+    ui_accounts.CX.switch = fake_switch
+    c2.ide.event_generate("<Button-1>")
+    yield wait()
+    assert app.confirm_win is not None and "Переключить Codex на cx2@example.com?" in texts(app.confirm_win)
+    app.confirm_win.event_generate("<Return>")
+    yield wait(5, lambda: switched == ["cx2@example.com"] and not app.codex_switching, "Codex не переключился")
+    assert app.status.cget("text") == "Codex теперь работает под cx2@example.com", app.status.cget("text")
+    ui_accounts.CX.switch = real_switch
+    accounts.remove_profile(other)
+    app.status_sticky = 0
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "codex:cx2@example.com" not in app.cards, "плитка не убралась")
+    step("«→ в Codex» у другого аккаунта ChatGPT (вид как у «→ в IDE»), подтверждение, смена; у текущего — «● IDE»")
 
     # удаление: профиль и его папка, имя; аккаунт программы удалить нельзя
     prof = next(p for p in accounts.load_profiles() if p["kind"] == "claude")

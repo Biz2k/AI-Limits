@@ -104,12 +104,16 @@ class HistoryMixin:
             cv.create_text(x(t.timestamp()), h - bottom + 3, anchor="n", fill=FAINT, font=(FONT, 8),
                            text=day(t.weekday()) if week else f"{t:%H}:00")
             t += step
-        width = max(1, round(k))  # 1.5.2 (владелец): линия вдвое тоньше прежней (2 · масштаб)
+        width = max(2, round(2 * k))
         for thin, run in H.graph_path(pts):
-            if thin:  # спуск при сбросе и отрезок на нуле — не рисуем (владелец, 1.5.2)
+            if not thin:
+                cv.create_line([c for ts, used in run for c in (x(max(ts, now - span)), y(used))], fill=BLUE,
+                               width=width, joinstyle="round")
                 continue
-            cv.create_line([c for ts, used in run for c in (x(max(ts, now - span)), y(used))], fill=BLUE,
-                           width=width, joinstyle="round")
+            for (t0, u0), (t1, u1) in zip(run, run[1:]):  # тонкие: спуски при сбросе — вдвое тоньше,
+                if t0 == t1:                               # отрезки на нуле не рисуем (владелец, 1.5.2)
+                    cv.create_line(x(max(t0, now - span)), y(u0), x(max(t1, now - span)), y(u1), fill=BLUE,
+                                   width=width / 2)
         if pts:
             ts, used, _ = pts[-1]
             r = max(3, round(3 * k))

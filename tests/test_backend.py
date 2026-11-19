@@ -15,6 +15,7 @@ for _k in ("ANTIGRAVITY_OAUTH_CLIENT_ID", "ANTIGRAVITY_OAUTH_CLIENT_SECRET", "AN
     os.environ.pop(_k, None)
 
 import cloud  # noqa: E402
+import codex_switch  # noqa: E402
 import accounts  # noqa: E402
 import history  # noqa: E402
 import i18n  # noqa: E402
@@ -500,6 +501,85 @@ def test_accounts():
 
 
 # ------------------------------------------------------------------ вывод без токенов
+
+
+def test_codex_switch():
+    """«→ в Codex»: копия входа, закрытие приложения, прежний вход — в профиль, запись, проверка, запуск; откат."""
+    storage.CODEX_AUTH = os.path.join(storage.APPDIR, "codex_home", "auth.json")
+    os.makedirs(os.path.dirname(storage.CODEX_AUTH), exist_ok=True)
+
+    def auth(email):
+        return {"auth_mode": "chatgpt", "tokens": {"id_token": fake_jwt({"email": email}), "access_token": "at-" + email,
+                                                    "refresh_token": "rt-" + email, "account_id": "acc-" + email}}
+    with open(storage.CODEX_AUTH, "w", encoding="utf-8") as f:
+        json.dump(auth("main@example.com"), f)
+    target = {"kind": "chatgpt", "dir": "chatgpt-target", "email": "two@example.com", "account_id": "acc-two"}
+    os.makedirs(os.path.join(accounts.profiles_dir(), target["dir"]), exist_ok=True)
+    accounts.write_secret(target, auth("two@example.com"))
+    accounts.save_profiles([q for q in accounts.load_profiles() if q["kind"] != "chatgpt"] + [target])
+
+    app = "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1.0_x64__pubid\\app\\ChatGPT.exe"
+    procs = {}
+
+    def launch():
+        procs.update({11: ("ChatGPT.exe", app), 12: ("codex.exe", app.replace("ChatGPT.exe", "resources\\codex.exe"))})
+    launch()
+    calls, started = [], []
+    real = (winapi._win_processes, winapi._win_process_text, winapi._run_hidden, winapi._win_window_pids,
+            codex_switch.start_app)
+    winapi._win_processes = lambda: [(pid, n) for pid, (n, _) in procs.items()]
+    winapi._win_process_text = lambda pid, what: procs.get(pid, (None, None))[1]
+
+    def run(args, timeout=8):
+        calls.append(args)
+        for pid in [p for p, (_, path) in procs.items() if "OpenAI.Codex_" in path]:
+            procs.pop(pid)  # приложение закрылось
+    winapi._run_hidden = run
+    winapi._win_window_pids = lambda: set(procs)
+    codex_switch.start_app = started.append
+    try:
+        assert codex_switch.app_family() == "OpenAI.Codex_pubid" and not codex_switch.cli_running()
+        r = codex_switch.switch(target)
+        assert r["email"] == "two@example.com" and r["created"] and r["restarted"], r
+        assert accounts.codex_ide_email() == "two@example.com" and started == ["OpenAI.Codex_pubid"]
+        assert calls and "/F" not in calls[0]                             # сначала — штатное закрытие
+        kept = r["kept"]
+        assert kept["email"] == "main@example.com" and kept in accounts.load_profiles()
+        assert accounts.read_secret(kept)["tokens"]["refresh_token"] == "rt-main@example.com"  # прежний вход сохранён
+        bdir = codex_switch.backups_dir()
+        names = os.listdir(bdir)
+        assert len(names) == 1 and b"rt-main" not in open(os.path.join(bdir, names[0]), "rb").read()  # зашифрована
+        assert codex_switch.switch(target)["kept"] is None                # уже в нём — ничего не делаем
+
+        r = codex_switch.switch(kept)                                      # обратно (приложение закрыто)
+        assert accounts.codex_ide_email() == "main@example.com" and not r["created"] and not r["restarted"]
+        assert accounts.read_secret(target)["tokens"]["access_token"] == "at-two@example.com"  # свежий вход — в профиль
+
+        procs[20] = ("codex.exe", "C:\\Tools\\codex\\codex.exe")            # Codex в терминале — не трогаем
+        expect_error(RuntimeError, lambda: codex_switch.switch(target))
+        assert accounts.codex_ide_email() == "main@example.com"
+        procs.clear()
+
+        launch()
+        started.clear()
+        real_write = codex_switch._write_auth
+        codex_switch._write_auth = lambda raw: real_write(
+            json.dumps(auth("bad@example.com")).encode() if b"at-two@" in raw else raw)
+        err = expect_error(RuntimeError, lambda: codex_switch.switch(target))  # записалось не то — откат
+        codex_switch._write_auth = real_write
+        assert "записался" in err and accounts.codex_ide_email() == "main@example.com", err
+        assert started == ["OpenAI.Codex_pubid"]                          # приложение запущено снова
+        assert len(os.listdir(bdir)) <= codex_switch.KEEP_BACKUPS
+    finally:
+        (winapi._win_processes, winapi._win_process_text, winapi._run_hidden, winapi._win_window_pids,
+         codex_switch.start_app) = real
+        for q in accounts.load_profiles():  # следующим проверкам — прежний набор профилей
+            if q["kind"] == "chatgpt":
+                accounts.remove_profile(q)
+    step("«→ в Codex»: копия входа, штатное закрытие приложения, прежний вход — в профиль (новый, если не добавлен),"
+         " запуск снова; Codex в терминале — отказ; не тот аккаунт после записи — откат")
+
+
 def test_no_tokens_in_output():
     cloud.load_accounts = lambda: [{"email": "a@example.com", "refresh_token": FAKE_R}]
     cloud.claude_fetch = lambda: {"plan": "pro", "limits": []}
@@ -663,6 +743,7 @@ def main():
     test_switch()
     test_codex()
     test_accounts()
+    test_codex_switch()
     test_no_tokens_in_output()
     test_history()
     test_translations()

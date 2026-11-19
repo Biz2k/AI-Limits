@@ -132,9 +132,10 @@ class CardView:
         self.summary.grid(row=0, column=4, padx=(0, 8))
         self.ide = tk.Label(h, bg=CARD)
         self.ide.grid(row=0, column=5, padx=(0, 10))
-        self.ide.bind("<Button-1>", lambda e: self.ide_mode == "switch" and app.switch_ide(key))
-        self.ide.bind("<Enter>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=FG))
-        self.ide.bind("<Leave>", lambda e: self.ide_mode == "switch" and self.ide.config(fg=MUTED))
+        sw = lambda: (self.ide_mode or "").startswith("switch")  # noqa: E731
+        self.ide.bind("<Button-1>", lambda e: sw() and app.switch_ide(key))
+        self.ide.bind("<Enter>", lambda e: sw() and self.ide.config(fg=FG))
+        self.ide.bind("<Leave>", lambda e: sw() and self.ide.config(fg=MUTED))
         self.ide_tip = Tooltip(self.ide, "")
         self.arrow.bind("<Button-1>", lambda e: self.collapsible and app.toggle(key))
         self.title.bind("<Double-Button-1>", lambda e: app.begin_rename(key))  # переименовать прямо в плитке
@@ -180,15 +181,19 @@ class CardView:
             _set(self.summary, text=spec["summary"][0], fg=spec["summary"][1])
         _vis(self.summary, bool(spec["summary"]))
 
-        mode = spec["ide"]  # None | "current" | "switch"
+        mode = spec["ide"]  # None | "current" | "switch" (+ "_codex": аккаунт ChatGPT, программа — Codex)
         if mode != self.ide_mode:
             self.ide_mode = mode
-            if mode == "current":
+            codex = bool(mode) and mode.endswith("_codex")
+            if mode and mode.startswith("current"):
                 self.ide.config(text="● IDE", bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
-                self.ide_tip.text = T("Этот аккаунт сейчас вошёл в IDE Antigravity")
-            elif mode == "switch":
-                self.ide.config(text=T("→ в IDE"), bg=CARD_HI, fg=MUTED, font=(FONT, 9), cursor="hand2", padx=6)
-                self.ide_tip.text = T("Сделать этот аккаунт текущим в IDE Antigravity")
+                self.ide_tip.text = (T("Этот аккаунт сейчас вошёл в Codex") if codex
+                                     else T("Этот аккаунт сейчас вошёл в IDE Antigravity"))
+            elif mode:  # кнопки смены аккаунта программы — одного вида у всех сервисов (решение владельца)
+                self.ide.config(text=T("→ в Codex") if codex else T("→ в IDE"), bg=CARD_HI, fg=MUTED,
+                                font=(FONT, 9), cursor="hand2", padx=6)
+                self.ide_tip.text = (T("Сделать этот аккаунт текущим в Codex") if codex
+                                     else T("Сделать этот аккаунт текущим в IDE Antigravity"))
             _vis(self.ide, bool(mode))
 
         msg = spec["msg"]  # (текст, цвет, шрифт, отступы) или None

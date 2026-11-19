@@ -290,6 +290,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
     # ------------------------------------------------ аккаунты
     def switch_ide(self, email):
+        if email.startswith("codex:"):  # плитка ChatGPT — кнопка «→ в Codex»
+            return self.switch_codex(email)
         if getattr(self, "ide_switching", False):
             return
         card = self.cards.get(email)
@@ -388,8 +390,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 msg=(T("Аккаунтов нет. Добавьте его в меню ⚙ → «Добавить аккаунт»."), MUTED, (FONT, 10), (8, 0)))))
         for key, t in tiles:
             title, accent, res = t["title"], ACCENT[t["kind"]], t["res"]
-            mode = "current" if t["ide"] else (
-                "switch" if t["kind"] == "google" and (ide_running or L.ide_installed()) else None)
+            mode = self.switch_mode(t, ide_running)
             if res is None:
                 specs.append((key, title, accent, spec(msg=loading, ide=mode)))
                 continue

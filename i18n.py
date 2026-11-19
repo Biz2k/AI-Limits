@@ -94,6 +94,48 @@ TEXTS = {
                                             "Не вдалося змінити акаунт: {error}"),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
     "макс.": ("max", "макс."),
+    'Codex не закрылся за {timeout} с':
+        ('Codex did not close within {timeout} s',
+         'Codex не закрився за {timeout} с'),
+    'во входе профиля нет аккаунта ChatGPT — добавьте его заново':
+        ('the profile sign-in has no ChatGPT account — add it again',
+         'у вході профілю немає акаунта ChatGPT — додайте його знову'),
+    'Codex запущен в терминале — закройте его и повторите':
+        ('Codex is running in a terminal — close it and try again',
+         'Codex запущено в терміналі — закрийте його і повторіть'),
+    'Codex: закрываю приложение…':
+        ('Codex: closing the app…',
+         'Codex: закриваю застосунок…'),
+    'в Codex записался {now}, а не {email}':
+        ('Codex got {now} instead of {email}',
+         'у Codex записався {now}, а не {email}'),
+    'Codex: запускаю приложение…':
+        ('Codex: starting the app…',
+         'Codex: запускаю застосунок…'),
+    'Этот аккаунт сейчас вошёл в Codex':
+        ('Codex is signed in to this account now',
+         'Цей акаунт зараз увійшов у Codex'),
+    '→ в Codex':
+        ('→ to Codex',
+         '→ в Codex'),
+    'Сделать этот аккаунт текущим в Codex':
+        ('Make this the current account in Codex',
+         'Зробити цей акаунт поточним у Codex'),
+    'Переключить Codex на {email}?':
+        ('Switch Codex to {email}?',
+         'Перемкнути Codex на {email}?'),
+    'Приложение Codex перезапустится, незавершённые ответы прервутся. Прежний вход сохранится в AI Limits — на него можно вернуться.':
+        ('The Codex app will restart and unfinished answers will stop. The current sign-in is kept in AI Limits, so you can switch back.',
+         "Застосунок Codex перезапуститься, незавершені відповіді перерв'ються. Попередній вхід збережеться в AI Limits — до нього можна повернутися."),
+    'Codex: подготовка…':
+        ('Codex: preparing…',
+         'Codex: підготовка…'),
+    'Не удалось сменить аккаунт Codex: {error}':
+        ('Could not switch the Codex account: {error}',
+         'Не вдалося змінити акаунт Codex: {error}'),
+    'Codex теперь работает под {email}':
+        ('Codex now works as {email}',
+         'Codex тепер працює під {email}'),
     'Войдите в аккаунт Claude в открывшемся браузере…':
         ('Sign in to your Claude account in the browser that opened…',
          'Увійдіть в акаунт Claude у браузері, що відкрився…'),
