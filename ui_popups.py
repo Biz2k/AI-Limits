@@ -10,7 +10,8 @@ import limits as L
 from i18n import T
 from ui_theme import fade_in
 from ui_theme import (
-    CARD, CARD_HI, FAINT, FG, FONT, FONT_D, FlatButton, BLUE, GREEN, INTERVALS, LINE, MUTED, RED, YELLOW,
+    CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, FONT_D, FlatButton, BLUE, GOOGLE, GREEN, INTERVALS, LINE, MUTED,
+    RED, YELLOW,
     color_for)
 from autostart import autostart_enabled, set_autostart
 
@@ -125,6 +126,7 @@ class PopupsMixin:
         if getattr(self, "menu_win", None):
             self.close_menu()
         else:
+            self._menu_manage = False  # «Управление аккаунтами» открывается свёрнутым
             self._show_menu(False, fade=True)
 
     def _show_menu(self, show_remove, fade=False):
@@ -194,12 +196,21 @@ class PopupsMixin:
             self.close_menu()
             fn()
 
-        # «Добавить аккаунт» раскрывает выбор сервиса (show_remove здесь — раскрыт ли этот выбор)
+        # «Добавить аккаунт» раскрывает выбор сервиса (show_remove здесь — раскрыт ли этот выбор); названия
+        # сервисов — их цветами, как в «Управлении аккаунтами» (1.5.3, владелец)
         item(T("Добавить аккаунт"), lambda: self._show_menu(not show_remove), mark="▾" if show_remove else "▸")
         if show_remove:
-            for kind, label in (("claude", "Claude"), ("chatgpt", "ChatGPT"), ("google", "Google")):
-                item("   " + label, lambda k=kind: run(lambda: self.add_account(k)), fg=MUTED)
-        item(T("Управление аккаунтами"), self.show_accounts, mark="›")
+            for kind, label, color in (("claude", "Claude", CLAUDE), ("chatgpt", "ChatGPT", CODEX),
+                                       ("google", "Google", GOOGLE)):
+                item("   " + label, lambda k=kind: run(lambda: self.add_account(k)), fg=color)
+        manage = getattr(self, "_menu_manage", False)  # «Управление аккаунтами» — раскрывающийся список (1.5.3)
+
+        def toggle_manage():
+            self._menu_manage = not manage
+            self._show_menu(show_remove)
+        item(T("Управление аккаунтами"), toggle_manage, mark="▾" if manage else "▸")
+        if manage:
+            self.accounts_list(box, lambda: self._show_menu(show_remove))
         sep()
         topmost = bool(self.root.attributes("-topmost"))
         item(T("Поверх всех окон"),

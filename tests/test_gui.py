@@ -524,24 +524,34 @@ def main():
     assert accounts.name_error("работа", list(app.names().values())) and accounts.name_error("Codex", [])
     step("переименование двойным щелчком по имени в плитке; дубликат и название программы не применяются")
 
-    # «Управление аккаунтами»: на месте меню, «←» обратно, группы по сервисам, имя и email
+    # «Управление аккаунтами»: раскрывающийся пункт меню ⚙ (как «Добавить аккаунт»), группы по сервисам, имя и email
     app.open_menu()
     yield wait()
-    item = next(w for w in app.menu_win.winfo_children()[0].winfo_children() if "Управление аккаунтами" in texts(w))
+
+    def menu_item(name):
+        return next(w for w in app.menu_win.winfo_children()[0].winfo_children() if name in texts(w))
+    assert "Работа" not in texts(app.menu_win)                           # открывается свёрнутым
+    menu_item("Добавить аккаунт").winfo_children()[-1].event_generate("<Button-1>")
+    yield wait()
+    colors = {w.cget("text").strip(): w.cget("fg") for w in app.menu_win.winfo_children()[0].winfo_children()
+              for w in w.winfo_children() if isinstance(w, tk.Label) and w.cget("text").strip() in ("Claude", "ChatGPT", "Google")}
+    assert colors == {"Claude": G.ACCENT["claude"], "ChatGPT": G.ACCENT["chatgpt"], "Google": G.ACCENT["google"]}, colors
+    item = menu_item("Управление аккаунтами")
+    assert item.winfo_children()[0].cget("text") == "▸"
     item.winfo_children()[-1].event_generate("<Button-1>")
     yield wait()
     t = texts(app.menu_win)
     for need in ("Управление аккаунтами", "Claude", "ChatGPT", "Google", "Работа", "me@example.com  ·  из программы",
-                 "a", "a@example.com", "b", "b@example.com", "←"):
+                 "a", "a@example.com", "b", "b@example.com", "Поверх всех окон", "▾"):
         assert need in t, (need, t)
-    assert t.index("Claude") < t.index("Работа") < t.index("ChatGPT") < t.index("Google") < t.index("a@example.com")
-    back = next(w for w in app.menu_win.winfo_children()[0].winfo_children()[0].winfo_children() if w.cget("text") == "←")
-    back.event_generate("<Button-1>")
+    assert "←" not in t
+    assert t.index("Управление аккаунтами") < t.index("Работа") < t.index("a@example.com") < t.index("Поверх всех окон")
+    menu_item("Управление аккаунтами").winfo_children()[-1].event_generate("<Button-1>")  # повторный щелчок — свернуть
     yield wait()
-    assert "Добавить аккаунт" in texts(app.menu_win)
+    assert "Работа" not in texts(app.menu_win) and "Добавить аккаунт" in texts(app.menu_win)
     app.close_menu()
-    step("«Управление аккаунтами»: на месте меню ⚙, «←» — назад, группы по сервисам, имя и email мелко")
-
+    step("«Управление аккаунтами» — раскрывающийся пункт меню ⚙, группы по сервисам, имя и email мелко;"
+         " сервисы в «Добавить аккаунт» — их цветами")
     # добавление аккаунтов Claude и ChatGPT (вход программы подменён): совпал с программой — плитка получает имя
     STATE["codex"] = True
     started = []
