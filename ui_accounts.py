@@ -10,6 +10,7 @@ import time
 import tkinter as tk
 
 import accounts as A
+import claude_switch as CL
 import codex_switch as CX
 import history as H
 import limits as L
@@ -287,47 +288,56 @@ class AccountsMixin:
         """Метка или кнопка плитки: "current"/"switch" (IDE Antigravity), "current_codex"/"switch_codex" (Codex)."""
         if t["kind"] == "google":
             return "current" if t["ide"] else ("switch" if ide_running or L.ide_installed() else None)
-        if t["kind"] == "chatgpt":
-            if t["ide"]:
-                return "current_codex"
-            return "switch_codex" if t.get("profile") and self.has_prog.get("chatgpt") else None
-        return "current" if t["ide"] else None  # Claude: кнопки «→ в Claude» пока нет
+        suffix = {"chatgpt": "_codex", "claude": "_claude"}[t["kind"]]
+        if t["ide"]:
+            return "current" + suffix
+        return "switch" + suffix if t.get("profile") and self.has_prog.get(t["kind"]) else None
 
-    def switch_codex(self, key):
-        if getattr(self, "codex_switching", False):
+    def switch_program(self, key):
+        """Кнопка «→ в Codex» / «→ в Claude»: подтверждение, затем смена аккаунта программы в потоке."""
+        if getattr(self, "prog_switching", False):
             return
         t, card = getattr(self, "tile_info", {}).get(key), self.cards.get(key)
         if not t or not t.get("profile"):
             return
-        self.confirm(card.ide if card else self.menu_btn,
-                     T("Переключить Codex на {email}?", email=t["email"]),
-                     T("Приложение Codex перезапустится, незавершённые ответы прервутся. Прежний вход "
-                       "сохранится в AI Limits — на него можно вернуться."),
-                     lambda: self._switch_codex_go(t["profile"]))
+        if t["kind"] == "chatgpt":
+            title = T("Переключить Codex на {email}?", email=t["email"])
+            text = T("Приложение Codex перезапустится, незавершённые ответы прервутся. Прежний вход "
+                     "сохранится в AI Limits — на него можно вернуться.")
+        else:
+            title = T("Переключить Claude Code на {email}?", email=t["email"])
+            text = T("Новые сеансы Claude Code начнут работать под этим аккаунтом, открытые — под прежним до "
+                     "перезапуска; открытый сеанс может вернуть прежний вход, тогда повторите смену. Прежний вход "
+                     "сохранится в AI Limits — на него можно вернуться.")
+        self.confirm(card.ide if card else self.menu_btn, title, text,
+                     lambda: self._switch_program_go(t["kind"], t["profile"]))
 
-    def _switch_codex_go(self, profile):
-        self.codex_switching = True
-        self.say(T("Codex: подготовка…"), CODEX)
+    def _switch_program_go(self, kind, profile):
+        self.prog_switching = True
+        color, mod = (CODEX, CX) if kind == "chatgpt" else (CLAUDE, CL)
+        self.say(T("Codex: подготовка…") if kind == "chatgpt" else T("Claude: подготовка…"), color)
 
         def work():
             try:
-                r = CX.switch(profile, on_status=lambda s: self.root.after(0, lambda: self.say(s, CODEX)))
+                r = mod.switch(profile, on_status=lambda s: self.root.after(0, lambda: self.say(s, color)))
                 failed = None
             except Exception as e:
-                r, failed = None, T("Не удалось сменить аккаунт Codex: {error}", error=e)
+                r, failed = None, (T("Не удалось сменить аккаунт Codex: {error}", error=e) if kind == "chatgpt"
+                                   else T("Не удалось сменить аккаунт Claude Code: {error}", error=e))
 
             def done():
-                self.codex_switching = False
+                self.prog_switching = False
                 if failed:
                     self.notify(failed, RED, hold=20)
                     return
                 kept = r.get("kept")
-                if r.get("created") and kept:
-                    ident = A.ident("chatgpt", kept["email"])
+                if r.get("created") and kept:  # прежний аккаунт программы добавлен сам — дать ему имя
+                    ident = A.ident(kind, kept["email"])
                     if ident not in self.names():
-                        self.names()[ident] = A.suggest_name("chatgpt", kept["email"], self.taken_names(ident))
+                        self.names()[ident] = A.suggest_name(kind, kept["email"], self.taken_names(ident))
                         self.persist()
-                self.notify(T("Codex теперь работает под {email}", email=r["email"]), GREEN)
+                self.notify(T("Codex теперь работает под {email}", email=r["email"]) if kind == "chatgpt"
+                            else T("Claude Code теперь работает под {email}", email=r["email"]), GREEN)
                 self.refresh()
             self.root.after(0, done)
         threading.Thread(target=work, daemon=True).start()

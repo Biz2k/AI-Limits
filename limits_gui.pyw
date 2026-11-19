@@ -290,8 +290,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
     # ------------------------------------------------ аккаунты
     def switch_ide(self, email):
-        if email.startswith("codex:"):  # плитка ChatGPT — кнопка «→ в Codex»
-            return self.switch_codex(email)
+        if email.startswith(("codex:", "claude:")):  # плитки ChatGPT и Claude — «→ в Codex», «→ в Claude»
+            return self.switch_program(email)
         if getattr(self, "ide_switching", False):
             return
         card = self.cards.get(email)

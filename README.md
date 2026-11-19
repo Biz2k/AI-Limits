@@ -32,8 +32,8 @@ switch the account the Antigravity IDE is signed in to with one click.
 **Limits**
 - Weekly and 5-hour limits for Claude Code, Codex (ChatGPT subscription) and each Google account (Gemini), with
   reset time and countdown.
-- The app's own sign-ins of Claude Code and Codex are only read (Codex's is replaced only when you press
-  "→ to Codex"); the tokens of the profiles AI Limits signed in itself are kept encrypted and refreshed by AI Limits.
+- The app's own sign-ins of Claude Code and Codex are only read (replaced only when you press "→ to Codex" or
+  "→ to Claude"); the tokens of the profiles AI Limits signed in itself are kept encrypted and refreshed by AI Limits.
 - The limits of a closed Antigravity IDE come from the cloud using the IDE's own saved sign-in.
 - Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
 - The account with the most weekly limit left, of any service, is shown at the top right ("max … 100%").
@@ -50,6 +50,13 @@ switch the account the Antigravity IDE is signed in to with one click.
 - **"→ to Codex" button** on added ChatGPT accounts: makes Codex use that account. The Codex app is closed and
   started again; the current Codex sign-in is backed up and kept in AI Limits as an account you can switch back to
   (added automatically if it was not). Codex running in a terminal is not closed — you are asked to close it.
+
+**Claude Code account**
+- **"→ to Claude" button** on added Claude accounts: Claude Code starts working as that account. Only its sign-in is
+  replaced (the token in `~/.claude/.credentials.json` and the account in `~/.claude.json`; other settings stay);
+  Claude is not closed. New Claude Code sessions use the new account, open ones keep the previous one until restarted
+  — an open session may even bring the previous sign-in back, then switch again. The previous sign-in is backed up and
+  kept in AI Limits as an account you can switch back to.
 
 **Window**
 - Cards can be collapsed (a collapsed card shows how much of its weekly limit is left), reordered by dragging the
@@ -174,6 +181,7 @@ Everything lives in `%APPDATA%\ai-limits\`:
 | `ide_backups\` | copies of the IDE credentials taken before each account switch (last 5, encrypted) |
 | `ide_switch.log` | account switch log (tokens are masked) |
 | `codex_backups\` | copies of the Codex sign-in taken before each "→ to Codex" (last 5, encrypted) |
+| `claude_backups\` | copies of the Claude Code sign-in taken before each "→ to Claude" (last 5, encrypted) |
 | `app.log` | unhandled errors with the app version (token-like strings are masked) |
 
 Tokens, keys and the credential copies are encrypted with Windows DPAPI: only your Windows account on this
