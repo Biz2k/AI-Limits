@@ -358,53 +358,34 @@ class AccountsMixin:
             self.names().pop(ident, None)
             self.persist()
             self.refresh()
-            if getattr(self, "menu_win", None):
+            if getattr(self, "menu_win", None) or getattr(self, "_menu_manage", False):
                 self.show_accounts()
         if kind:
             self.confirm(anchor or self.menu_btn, T("Удалить «{name}» ({email})?", name=self.names().get(ident) or email,
                                                     email=email),
                          T("Вернуть его можно через «Добавить аккаунт»."), go, at_pointer=True)
 
-    # ------------------------------------------------ «Управление аккаунтами» (на месте меню ⚙)
+    # ------------------------------------------------ «Управление аккаунтами» (раскрывающийся пункт меню ⚙)
     def show_accounts(self):
-        """Окно «Управление аккаунтами» на месте меню настроек; «←» — обратно в меню."""
-        self.close_menu()
-        p = tk.Toplevel(self.root)
-        p.overrideredirect(True)
-        p.attributes("-topmost", True)
-        p.configure(bg=LINE)
-        box = tk.Frame(p, bg=CARD, padx=10, pady=8)
-        box.pack(padx=1, pady=1)
-        self.menu_win = p
-        head = tk.Frame(box, bg=CARD)
-        head.pack(fill="x", pady=(0, 6))
-        back = tk.Label(head, text="←", bg=CARD, fg=MUTED, font=(FONT, 14), cursor="hand2", padx=4)
-        back.pack(side="left")
-        back.bind("<Button-1>", lambda e: self._show_menu(False))
-        back.bind("<Enter>", lambda e: back.config(fg=FG))
-        back.bind("<Leave>", lambda e: back.config(fg=MUTED))
-        tk.Label(head, text=T("Управление аккаунтами"), bg=CARD, fg=FG, font=(FONT, 11, "bold")).pack(side="left", padx=6)
+        """Меню ⚙ с раскрытым «Управлением аккаунтами» (1.5.3: раньше — отдельное окно на месте меню)."""
+        self._menu_manage = True
+        self._show_menu(False)
 
+    def accounts_list(self, box, redraw):
+        """Аккаунты по сервисам внутри меню: группа — цветом сервиса, строка — имя и мелко email, ✎ и ✕."""
         for kind, rows in self.all_accounts().items():
             tk.Label(box, text=GROUP[kind], bg=CARD, fg=ACCENT[kind], font=(FONT, 9, "bold"),
-                     anchor="w").pack(fill="x", pady=(8, 2), padx=4)
+                     anchor="w").pack(fill="x", pady=(6, 1), padx=(30, 4))
             if not rows:
-                tk.Label(box, text=T("нет аккаунтов"), bg=CARD, fg=FAINT, font=(FONT, 9), anchor="w").pack(fill="x", padx=14)
+                tk.Label(box, text=T("нет аккаунтов"), bg=CARD, fg=FAINT, font=(FONT, 9),
+                         anchor="w").pack(fill="x", padx=(38, 4))
             for ident, name, email, stored, prof in rows:
-                self._account_row(box, kind, ident, name, email, stored)
+                self._account_row(box, kind, ident, name, email, stored, redraw)
         tk.Frame(box, bg=CARD, height=4).pack()
 
-        p.update_idletasks()
-        bx = self.menu_btn.winfo_rootx()
-        right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
-        p.geometry(f"+{min(bx, right - p.winfo_reqwidth())}+{self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4}")
-        p.bind("<Escape>", self.close_menu)
-        p.focus_force()
-        p.bind("<FocusOut>", lambda e: self.root.after(120, self._menu_focus_check))
-
-    def _account_row(self, box, kind, ident, name, email, stored):
+    def _account_row(self, box, kind, ident, name, email, stored, redraw=None):
         row = tk.Frame(box, bg=CARD)
-        row.pack(fill="x", padx=(10, 2), pady=2)
+        row.pack(fill="x", padx=(36, 2), pady=1)
         text = tk.Frame(row, bg=CARD)
         text.pack(side="left", fill="x", expand=True)
         title = tk.Label(text, text=name or A.PRODUCT[kind], bg=CARD, fg=FG if name else MUTED, font=(FONT, 10), anchor="w")
@@ -421,7 +402,7 @@ class AccountsMixin:
             return b
         if stored:
             button("✕", lambda b: self.remove_account(ident, b))
-        button("✎", lambda b: self._rename_entry(title, ident, name or "", on_done=self.show_accounts))
+        button("✎", lambda b: self._rename_entry(title, ident, name or "", on_done=redraw or self.show_accounts))
 
     # ------------------------------------------------ переименование
     def _rename_entry(self, label, ident, current, on_done=None, font=None):
