@@ -406,7 +406,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             folded = key in self.collapsed
             plan = res.get("plan") or ""
             if t["kind"] == "google":
-                plan = "ULTRA" if "ultra" in plan.lower() else ("PRO" if "pro" in plan.lower() else plan)
+                low = plan.lower()  # бесплатный тариф Google называет «Antigravity Starter Quota» — значок FREE
+                plan = ("ULTRA" if "ultra" in low else "PRO" if "pro" in low else
+                        "FREE" if "starter" in low or "free" in low else plan)
             specs.append((key, title, accent, spec(
                 collapsible=True, folded=folded, badge=plan, ide=mode,
                 summary=self.weekly_left(rows) if folded else None,
