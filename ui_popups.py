@@ -14,6 +14,8 @@ from ui_theme import (
     color_for)
 from autostart import autostart_enabled, set_autostart
 
+POINTER_GAP = 24  # окно подтверждения у указателя мыши — с таким зазором, чтобы не перекрывать то, что под ним
+
 
 class PopupsMixin:
     """Часть класса App (limits_gui.pyw): всплывающие окна. Пользуется полями и методами App через self."""
@@ -48,11 +50,15 @@ class PopupsMixin:
                 pass
         return 0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight()
 
-    def confirm(self, anchor, title, text, on_yes):
+    def confirm(self, anchor, title, text, on_yes, at_pointer=False):
         """Своё тёмное окно подтверждения (вместо системного) рядом с виджетом anchor, в пределах экрана.
+        at_pointer — рядом с указателем мыши (не вплотную) и в пределах главного окна (1.5.2: удаление аккаунта
+        из меню — его кнопка исчезает вместе с меню, и окно уезжало в угол экрана).
         «Да» вызывает on_yes; «Нет», Esc и щелчок мимо окна — закрывают."""
         self.close_confirm()
-        self.close_menu()
+        px, py = self.root.winfo_pointerxy()
+        ax, ay, aw, ah = anchor.winfo_rootx(), anchor.winfo_rooty(), anchor.winfo_width(), anchor.winfo_height()
+        self.close_menu()  # координаты взяты до закрытия меню: anchor может лежать в нём
         p = tk.Toplevel(self.root)
         p.overrideredirect(True)
         p.attributes("-topmost", True)
@@ -77,12 +83,21 @@ class PopupsMixin:
         # под кнопкой, правым краем по её правому краю; не помещается — над ней; всегда в пределах монитора
         p.update_idletasks()
         w, h = p.winfo_reqwidth(), p.winfo_reqheight()
-        ax, ay = anchor.winfo_rootx(), anchor.winfo_rooty()
-        left, top, right, bottom = self._work_area(ax, ay)
-        x = ax + anchor.winfo_width() - w
-        y = ay + anchor.winfo_height() + 6
-        if y + h > bottom - 8:
-            y = ay - h - 6
+        if at_pointer:
+            x, y = px - w // 2, py + POINTER_GAP  # под указателем, с зазором
+            r = self.root
+            left, top = r.winfo_rootx(), r.winfo_rooty()
+            right, bottom = left + r.winfo_width(), top + r.winfo_height()
+            if y + h > bottom - 8:
+                y = py - h - POINTER_GAP  # снизу не помещается — над указателем
+            if w > right - left - 16 or h > bottom - top - 16:  # окно меньше подтверждения — по экрану
+                left, top, right, bottom = self._work_area(px, py)
+        else:
+            left, top, right, bottom = self._work_area(ax, ay)
+            x = ax + aw - w
+            y = ay + ah + 6
+            if y + h > bottom - 8:
+                y = ay - h - 6
         x = max(left + 8, min(x, right - w - 8))
         y = max(top + 8, min(y, bottom - h - 8))
         p.geometry(f"+{x}+{y}")

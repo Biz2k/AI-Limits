@@ -302,7 +302,7 @@ class AccountsMixin:
         if kind:
             self.confirm(anchor or self.menu_btn, T("Удалить «{name}» ({email})?", name=self.names().get(ident) or email,
                                                     email=email),
-                         T("Вернуть его можно через «Добавить аккаунт»."), go)
+                         T("Вернуть его можно через «Добавить аккаунт»."), go, at_pointer=True)
 
     # ------------------------------------------------ «Управление аккаунтами» (на месте меню ⚙)
     def show_accounts(self):
