@@ -181,19 +181,21 @@ class CardView:
             _set(self.summary, text=spec["summary"][0], fg=spec["summary"][1])
         _vis(self.summary, bool(spec["summary"]))
 
-        mode = spec["ide"]  # None | "current" | "switch" (+ "_codex": аккаунт ChatGPT, программа — Codex)
+        mode = spec["ide"]  # None | "current" | "switch"; "_codex" / "_claude" — программа Codex / Claude Code
         if mode != self.ide_mode:
             self.ide_mode = mode
-            codex = bool(mode) and mode.endswith("_codex")
+            prog = (mode or "").partition("_")[2]
             if mode and mode.startswith("current"):
                 self.ide.config(text="● IDE", bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
-                self.ide_tip.text = (T("Этот аккаунт сейчас вошёл в Codex") if codex
-                                     else T("Этот аккаунт сейчас вошёл в IDE Antigravity"))
+                self.ide_tip.text = {"codex": T("Этот аккаунт сейчас вошёл в Codex"),
+                                     "claude": T("Этот аккаунт сейчас вошёл в Claude Code")}.get(
+                                         prog, T("Этот аккаунт сейчас вошёл в IDE Antigravity"))
             elif mode:  # кнопки смены аккаунта программы — одного вида у всех сервисов (решение владельца)
-                self.ide.config(text=T("→ в Codex") if codex else T("→ в IDE"), bg=CARD_HI, fg=MUTED,
-                                font=(FONT, 9), cursor="hand2", padx=6)
-                self.ide_tip.text = (T("Сделать этот аккаунт текущим в Codex") if codex
-                                     else T("Сделать этот аккаунт текущим в IDE Antigravity"))
+                self.ide.config(text={"codex": T("→ в Codex"), "claude": T("→ в Claude")}.get(prog, T("→ в IDE")),
+                                bg=CARD_HI, fg=MUTED, font=(FONT, 9), cursor="hand2", padx=6)
+                self.ide_tip.text = {"codex": T("Сделать этот аккаунт текущим в Codex"),
+                                     "claude": T("Сделать этот аккаунт текущим в Claude Code")}.get(
+                                         prog, T("Сделать этот аккаунт текущим в IDE Antigravity"))
             _vis(self.ide, bool(mode))
 
         msg = spec["msg"]  # (текст, цвет, шрифт, отступы) или None

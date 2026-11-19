@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _k in ("ANTIGRAVITY_OAUTH_CLIENT_ID", "ANTIGRAVITY_OAUTH_CLIENT_SECRET", "ANTIGRAVITY_USER_AGENT"):
     os.environ.pop(_k, None)
 
+import claude_switch  # noqa: E402
 import cloud  # noqa: E402
 import codex_switch  # noqa: E402
 import accounts  # noqa: E402
@@ -580,6 +581,66 @@ def test_codex_switch():
          " запуск снова; Codex в терминале — отказ; не тот аккаунт после записи — откат")
 
 
+def test_claude_switch():
+    """«→ в Claude»: копия входа, прежний вход — в профиль, запись токенов и аккаунта без потери остального, откат."""
+    home = os.path.join(storage.APPDIR, "claude_home")
+    os.makedirs(home, exist_ok=True)
+    real_cfg, real_creds = claude_switch.config_path, storage.CLAUDE_CREDS
+    claude_switch.config_path = lambda: os.path.join(home, ".claude.json")
+    storage.CLAUDE_CREDS = os.path.join(home, ".claude", ".credentials.json")
+
+    def oauth(email):
+        return {"accessToken": "sk-ant-oat-" + email, "refreshToken": "sk-ant-ort-" + email, "expiresAt": 1}
+    storage.atomic_write_json(storage.CLAUDE_CREDS, {"claudeAiOauth": oauth("main@example.com"), "mcpOAuth": {"m": 1}})
+    storage.atomic_write_json(claude_switch.config_path(), {
+        "projects": {"x": 1}, "oauthAccount": {"emailAddress": "main@example.com", "organizationUuid": "org-main"}})
+    target = {"kind": "claude", "dir": "claude-target", "email": "two@example.com", "org": "org-two"}
+    os.makedirs(os.path.join(accounts.profiles_dir(), target["dir"]), exist_ok=True)
+    accounts.write_secret(target, {"claudeAiOauth": oauth("two@example.com")})
+    storage.atomic_write_json(accounts.profile_path(target, ".claude.json"),
+                              {"oauthAccount": {"emailAddress": "two@example.com", "organizationUuid": "org-two",
+                                                "displayName": "Two"}})
+    before = accounts.load_profiles()
+    accounts.save_profiles(before + [target])
+    try:
+        r = claude_switch.switch(target)
+        cfg = json.load(open(claude_switch.config_path(), encoding="utf-8"))
+        creds = json.load(open(storage.CLAUDE_CREDS, encoding="utf-8"))
+        assert r["email"] == "two@example.com" and r["created"], r
+        assert cfg["oauthAccount"]["displayName"] == "Two" and cfg["projects"] == {"x": 1}   # остальное не тронуто
+        assert creds["claudeAiOauth"]["accessToken"] == "sk-ant-oat-two@example.com" and creds["mcpOAuth"] == {"m": 1}
+        kept = r["kept"]
+        assert kept["email"] == "main@example.com" and kept["org"] == "org-main"
+        saved = accounts.read_secret(kept)
+        assert saved["claudeAiOauth"]["refreshToken"] == "sk-ant-ort-main@example.com"
+        assert saved["oauthAccount"]["organizationUuid"] == "org-main"
+        names = os.listdir(claude_switch.backups_dir())
+        assert len(names) == 1 and b"sk-ant" not in open(os.path.join(claude_switch.backups_dir(), names[0]), "rb").read()
+        assert claude_switch.switch(target)["kept"] is None                # уже в нём — ничего не делаем
+
+        r = claude_switch.switch(kept)                                     # обратно — аккаунт и токены прежние
+        cfg = json.load(open(claude_switch.config_path(), encoding="utf-8"))
+        assert cfg["oauthAccount"]["emailAddress"] == "main@example.com" and not r["created"]
+        assert accounts.read_secret(target)["claudeAiOauth"]["accessToken"] == "sk-ant-oat-two@example.com"
+
+        real_write = claude_switch._write
+        claude_switch._write = lambda o, a: real_write(o, dict(a, emailAddress="bad@example.com")) \
+            if (a or {}).get("emailAddress") == "two@example.com" else real_write(o, a)
+        err = expect_error(RuntimeError, lambda: claude_switch.switch(target))  # записалось не то — откат
+        claude_switch._write = real_write
+        cfg = json.load(open(claude_switch.config_path(), encoding="utf-8"))
+        creds = json.load(open(storage.CLAUDE_CREDS, encoding="utf-8"))
+        assert "записался" in err and cfg["oauthAccount"]["emailAddress"] == "main@example.com", err
+        assert creds["claudeAiOauth"]["accessToken"] == "sk-ant-oat-main@example.com"
+    finally:
+        claude_switch.config_path, storage.CLAUDE_CREDS = real_cfg, real_creds
+        for q in accounts.load_profiles():
+            if q["dir"] not in {b["dir"] for b in before}:
+                accounts.remove_profile(q)
+    step("«→ в Claude»: копия входа, прежний вход — в профиль (новый, если не добавлен), токены и аккаунт"
+         " записаны без потери настроек и mcpOAuth; не тот аккаунт после записи — откат")
+
+
 def test_no_tokens_in_output():
     cloud.load_accounts = lambda: [{"email": "a@example.com", "refresh_token": FAKE_R}]
     cloud.claude_fetch = lambda: {"plan": "pro", "limits": []}
@@ -744,6 +805,7 @@ def main():
     test_codex()
     test_accounts()
     test_codex_switch()
+    test_claude_switch()
     test_no_tokens_in_output()
     test_history()
     test_translations()

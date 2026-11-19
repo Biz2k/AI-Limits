@@ -594,7 +594,23 @@ def main():
     yield wait(0.5)
     assert abs(root.winfo_height() - (app.cv.winfo_rooty() - root.winfo_rooty() + app.body.winfo_reqheight() + 14)) < 4         or root.winfo_height() >= root.winfo_screenheight() - 130, "окно не подогналось под новую плитку"
     assert t2["title"] == "second" and t2["res"]["limits"][0]["used"] == 30.0 and not t2["ide"]
-    assert app.cards["claude:second@example.com"].ide_mode is None      # кнопки «→ в …» у Claude пока нет
+    c3 = app.cards["claude:second@example.com"]
+    assert c3.ide_mode == "switch_claude" and c3.ide.cget("text") == "→ в Claude", (c3.ide_mode, c3.ide.cget("text"))
+    assert app.cards["claude"].ide_mode == "current_claude"           # недобавленный аккаунт Claude Code — «● IDE»
+    real_cl = ui_accounts.CL.switch
+    got = []
+    ui_accounts.CL.switch = lambda p, on_status=None: got.append(p["email"]) or {
+        "email": p["email"], "kept": {"kind": "claude", "email": "me@example.com", "dir": "claude-me"}, "created": True}
+    c3.ide.event_generate("<Button-1>")
+    yield wait()
+    assert "Переключить Claude Code на second@example.com?" in texts(app.confirm_win)
+    assert any("открытые — под прежним" in x for x in texts(app.confirm_win))  # предупреждение об открытых сеансах
+    app.confirm_win.event_generate("<Return>")
+    yield wait(5, lambda: got == ["second@example.com"] and not app.prog_switching, "Claude не переключился")
+    assert app.status.cget("text") == "Claude Code теперь работает под second@example.com"
+    assert app.names().get("claude:me@example.com") == "Работа"         # имя прежнего аккаунта сохранилось
+    ui_accounts.CL.switch = real_cl
+    app.status_sticky = 0
     app.add_account("claude")
     yield wait(10, lambda: not app.adding, "повтор не завершился")
     assert "уже добавлен" in app.status.cget("text") and len(accounts.load_profiles()) == 2
@@ -625,7 +641,7 @@ def main():
     yield wait()
     assert app.confirm_win is not None and "Переключить Codex на cx2@example.com?" in texts(app.confirm_win)
     app.confirm_win.event_generate("<Return>")
-    yield wait(5, lambda: switched == ["cx2@example.com"] and not app.codex_switching, "Codex не переключился")
+    yield wait(5, lambda: switched == ["cx2@example.com"] and not app.prog_switching, "Codex не переключился")
     assert app.status.cget("text") == "Codex теперь работает под cx2@example.com", app.status.cget("text")
     ui_accounts.CX.switch = real_switch
     accounts.remove_profile(other)

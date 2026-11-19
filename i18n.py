@@ -94,6 +94,36 @@ TEXTS = {
                                             "Не вдалося змінити акаунт: {error}"),
     "Нет данных о лимитах Gemini": ("No Gemini limit data", "Немає даних про ліміти Gemini"),
     "макс.": ("max", "макс."),
+    'Claude: записываю вход…':
+        ('Claude: writing the sign-in…',
+         'Claude: записую вхід…'),
+    'в Claude Code записался {now}, а не {email}':
+        ('Claude Code got {now} instead of {email}',
+         'у Claude Code записався {now}, а не {email}'),
+    'Переключить Claude Code на {email}?':
+        ('Switch Claude Code to {email}?',
+         'Перемкнути Claude Code на {email}?'),
+    'Новые сеансы Claude Code начнут работать под этим аккаунтом, открытые — под прежним до перезапуска; открытый сеанс может вернуть прежний вход, тогда повторите смену. Прежний вход сохранится в AI Limits — на него можно вернуться.':
+        ('New Claude Code sessions will use this account; open ones keep the previous account until restarted, and an open session may bring the previous sign-in back — then switch again. The current sign-in is kept in AI Limits, so you can switch back.',
+         'Нові сеанси Claude Code працюватимуть під цим акаунтом, відкриті — під попереднім до перезапуску; відкритий сеанс може повернути попередній вхід — тоді повторіть зміну. Попередній вхід збережеться в AI Limits — до нього можна повернутися.'),
+    'Claude: подготовка…':
+        ('Claude: preparing…',
+         'Claude: підготовка…'),
+    'Не удалось сменить аккаунт Claude Code: {error}':
+        ('Could not switch the Claude Code account: {error}',
+         'Не вдалося змінити акаунт Claude Code: {error}'),
+    'Claude Code теперь работает под {email}':
+        ('Claude Code now works as {email}',
+         'Claude Code тепер працює під {email}'),
+    'Этот аккаунт сейчас вошёл в Claude Code':
+        ('Claude Code is signed in to this account now',
+         'Цей акаунт зараз увійшов у Claude Code'),
+    '→ в Claude':
+        ('→ to Claude',
+         '→ в Claude'),
+    'Сделать этот аккаунт текущим в Claude Code':
+        ('Make this the current account in Claude Code',
+         'Зробити цей акаунт поточним у Claude Code'),
     'Codex не закрылся за {timeout} с':
         ('Codex did not close within {timeout} s',
          'Codex не закрився за {timeout} с'),
