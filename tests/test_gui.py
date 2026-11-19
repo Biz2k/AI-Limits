@@ -211,6 +211,17 @@ def main():
     assert "61%" in " ".join(texts(app.cards["a@example.com"].outer))
     step("обновление на месте: карточки и число виджетов прежние, значение новое")
 
+    real_ag = L.ag_fetch
+    L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), plan="Antigravity Starter Quota")
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert app.cards["b@example.com"].badge.cget("text") == "FREE", app.cards["b@example.com"].badge.cget("text")
+    L.ag_fetch = real_ag
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert app.cards["b@example.com"].badge.cget("text") == "PRO"
+    step("бесплатный тариф Google («Antigravity Starter Quota») — значок FREE")
+
     app.open_menu()
     yield wait(0.5)
     assert float(app.menu_win.attributes("-alpha")) > 0.99            # проявилось до конца
