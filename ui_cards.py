@@ -28,6 +28,7 @@ def mix(color, other, k):
 # плитка аккаунта, который сейчас не вошёл ни в одну программу (1.5.4, владелец): полоса и белые надписи тусклее
 DIM_STRIP = 0.55   # доля цвета фона в полосе
 DIM_TEXT = 0.35    # доля цвета фона в надписях
+DIM_COLOR = 0.5    # доля цвета фона в процентах, полосах лимитов и значке тарифа
 
 
 def _set(w, **kw):
@@ -95,6 +96,8 @@ class RowView:
             self.bar.set(0, FAINT)
             return
         col = FAINT if dim else color_for(used, warn)
+        if quiet and not dim:
+            col = mix(col, CARD, DIM_COLOR)
         _vis(self.nodata, False)
         _set(self.pct, text=f"{used:.0f}%", fg=col)
         _vis(self.pct, True)
@@ -206,11 +209,14 @@ class CardView:
             self.full_title = spec["title"]
             self.fit_title()
         if spec["badge"]:
-            _set(self.badge, text=spec["badge"].upper(), fg=spec.get("badge_fg") or self.accent)
+            # значок тарифа у тусклой плитки тоже тусклый; LOGOUT (свой цвет) — всегда яркий
+            _set(self.badge, text=spec["badge"].upper(), fg=spec.get("badge_fg") or (
+                mix(self.accent, CARD, DIM_COLOR) if quiet else self.accent))
         self.badge_tip.text = spec.get("badge_tip") or ""
         _vis(self.badge, bool(spec["badge"]))
         if spec["summary"]:
-            _set(self.summary, text=spec["summary"][0], fg=spec["summary"][1])
+            _set(self.summary, text=spec["summary"][0],
+                 fg=mix(spec["summary"][1], CARD, DIM_COLOR) if quiet else spec["summary"][1])
         _vis(self.summary, bool(spec["summary"]))
 
         mode = spec["ide"]  # None | "current" | "switch"; "_codex" / "_claude" — программа Codex / Claude Code
