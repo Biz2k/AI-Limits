@@ -401,7 +401,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
         def spec(**kw):
             return dict(dict(collapsible=False, folded=False, badge="", summary=None, ide=None,
-                             msg=None, rows=[], title=None, badge_fg=None, badge_tip="", dim=False), **kw)
+                             msg=None, rows=[], title=None, badge_fg=None, badge_tip="", dim=False,
+                             quiet=False), **kw)
 
         loading = (T("Загрузка…"), MUTED, (FONT, 10, "italic"), (10, 2))
 
@@ -416,11 +417,13 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         for key, t in tiles:
             title, accent, res = t["title"], ACCENT[t["kind"]], t["res"]
             mode = self.switch_mode(t, ide_running)
+            # аккаунт не вошёл ни в Claude Code, ни в Codex, ни в IDE — полоса и надписи тусклее (1.5.4)
+            quiet = not (mode or "").startswith("current")
             if res is None:
-                specs.append((key, title, accent, spec(msg=loading, ide=mode)))
+                specs.append((key, title, accent, spec(msg=loading, ide=mode, quiet=quiet)))
                 continue
             if isinstance(res, Exception):
-                specs.append((key, title, accent, spec(msg=failed(res), ide=mode)))
+                specs.append((key, title, accent, spec(msg=failed(res), ide=mode, quiet=quiet)))
                 continue
             seen, rows = set(), []  # убрать дубли (одинаковые имя и квота)
             for r in res.get("limits") or res.get("models") or []:
@@ -441,7 +444,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             specs.append((key, title, accent, spec(
                 collapsible=True, folded=folded, badge="LOGOUT" if off else plan,
                 ide=None if off else mode,  # у LOGOUT нет ни кнопки «→ в …», ни метки IDE (владелец)
-                badge_fg=RED if off else None, dim=off,
+                badge_fg=RED if off else None, dim=off, quiet=quiet,
                 badge_tip=T("Google просит подтвердить этот аккаунт (Verify your account).\n"
                             "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
                             "и не подтвердите аккаунт.") if off else "",
