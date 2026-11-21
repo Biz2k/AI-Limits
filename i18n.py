@@ -304,6 +304,12 @@ TEXTS = {
     "IDE запущена; новая версия IDE не даёт проверить вход — проверьте аккаунт в самой IDE":
         ("The IDE is running; the new IDE version does not allow checking the sign-in — check the account in the IDE",
          "IDE запущена; нова версія IDE не дає перевірити вхід — перевірте акаунт у самій IDE"),
+    "Google просит подтвердить аккаунт {email} — переключение отменено. Войдите в него заново кнопкой ↻ в "
+    "«Управлении аккаунтами»":
+        ("Google asks to verify the account {email} — the switch was cancelled. Sign in to it again with ↻ in "
+         "“Manage accounts”",
+         "Google просить підтвердити акаунт {email} — перемикання скасовано. Увійдіть у нього знову кнопкою ↻ в "
+         "«Керуванні акаунтами»"),
     "Вход не выполнен": ("Sign-in failed", "Вхід не виконано"),
     "неверный ответ Google": ("invalid response from Google", "неправильна відповідь Google"),
     "Вход {email} получен, но Google просит подтвердить аккаунт — ссылка на странице в браузере":

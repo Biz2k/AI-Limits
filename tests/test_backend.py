@@ -324,6 +324,15 @@ def test_switch():
         assert time.time() - began < 10 and "новая версия IDE" in err and b"new@example.com" in STORE["blob"], err
         IDE["hidden"] = False
 
+        # Google требует подтвердить аккаунт -> отказ до закрытия IDE, запись входа не тронута
+        STORE["blob"], IDE["run"] = cred("old@example.com"), True
+        real_problem = cloud.account_problem
+        cloud.account_problem = lambda tok, email: "Google просит подтвердить аккаунт " + email
+        del LOG[:]
+        err = expect_error(RuntimeError, lambda: ide_switch.ide_switch_account("new@example.com", timeout=5))
+        assert "подтвердить" in err and "stop" not in LOG and b"old@example.com" in STORE["blob"], (err, LOG)
+        cloud.account_problem = real_problem
+
         # IDE показала другой аккаунт -> откат
         STORE["blob"] = cred("old@example.com")
         ide_local.find_ide_servers = lambda diag=None: [(Srv(), {"email": "third@example.com"})]
@@ -920,6 +929,42 @@ def test_http_errors():
     step("ошибка HTTP: в тексте только сообщение сервера (без JSON), код и Retry-After — в полях ошибки")
 
 
+# ------------------------------------------------------------------ новая IDE: ключ сервера — из hub_<порт>.json
+def test_ide_hub():
+    hub = os.path.join(TMP, "daemon")
+    os.makedirs(hub, exist_ok=True)
+    with open(os.path.join(hub, "hub_2222.json"), "w", encoding="utf-8") as f:
+        json.dump({"pid": 4242, "httpsPort": 1111, "httpPort": 2222, "lsVersion": "2.34.0", "csrfToken": "tok-fake"}, f)
+    with open(os.path.join(hub, "hub_3333.json"), "w", encoding="utf-8") as f:   # другой (старый) процесс
+        json.dump({"pid": 9999, "httpsPort": 3331, "httpPort": 3333, "csrfToken": "other"}, f)
+    real = (ide_local.hub_dir, ide_local._ide_ls_processes, ide_local.IdeServer.status, winapi._win_local_ports)
+    asked = []
+
+    def status(self):
+        asked.append((self.port, self.scheme, self.csrf))
+        if (self.port, self.scheme, self.csrf) == (1111, "https", "tok-fake"):
+            return {"userStatus": {"email": "n@example.com"}}
+        raise RuntimeError("401")
+    ide_local.hub_dir = lambda: hub
+    ide_local._ide_ls_processes = lambda: [{"id": 4242, "cmd": "language_server.exe --standalone --override_ide_name "
+                                            "antigravity --read_host_bridge_token_from_stdin"}]
+    ide_local.IdeServer.status = status
+    winapi._win_local_ports = lambda: (_ for _ in ()).throw(AssertionError("таблица соединений не нужна"))
+    try:
+        ide_local._IDE_PORTS.clear()
+        found = ide_local.find_ide_servers()
+        assert [(s.port, us) for s, us in found] == [(1111, {"email": "n@example.com"})], found
+        assert not ide_local.ide_server_hidden()
+        os.remove(os.path.join(hub, "hub_2222.json"))                      # файла нет — спросить нельзя
+        ide_local._IDE_PORTS.clear()
+        diag = []
+        assert ide_local.find_ide_servers(diag) == [] and ide_local.ide_server_hidden(), diag
+    finally:
+        ide_local.hub_dir, ide_local._ide_ls_processes, ide_local.IdeServer.status, winapi._win_local_ports = real
+        ide_local._IDE_PORTS.clear()
+    step("новая IDE: ключ и порт сервера — из hub_<порт>.json по PID; без файла — «спросить нельзя»")
+
+
 def main():
     print("Проверка логики (вымышленные данные, папка", TMP + ")")
     test_dpapi()
@@ -927,6 +972,7 @@ def main():
     test_keys()
     test_user_agents()
     test_winapi()
+    test_ide_hub()
     fake_ide()
     test_backup_restore(old_copy)
     test_restore_command()
