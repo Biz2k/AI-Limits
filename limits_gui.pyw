@@ -246,9 +246,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             self.ide_running = bool(val.get("running") or val.get("window"))
             if val.get("email"):  # запущенная IDE знает свой аккаунт точнее записи входа
                 self.ide_email["google"] = val["email"]
-                self.ide_unverified = None
-            elif self.ide_running:  # окно IDE открыто, а входа нет (1.5.4): запись входа — не аккаунт IDE
-                self.ide_email["google"] = None
+            # окно IDE открыто, а входа нет (1.5.4): у аккаунта записи входа — серое «○ IDE», отдельной плитки нет
+            self.ide_nologin = self.ide_running and not val.get("email")
         elif key[0] == "google" or key == ("ide", "google"):
             email = key[1] if key[0] == "google" else (self.ide_email.get("google") or "")
             self.parts[key] = self._merge(email, val)
@@ -285,7 +284,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
     def redraw(self):
         self.data = self.build_tiles()
         sig = repr(([(k, {x: v for x, v in t.items() if x != "profile"}) for k, t in self.data],
-                    getattr(self, "ide_running", False), getattr(self, "ide_unverified", None),
+                    getattr(self, "ide_running", False), getattr(self, "ide_nologin", False),
                     sorted(self.names().items())))
         if sig == getattr(self, "_last_sig", None):  # ничего не изменилось — не перерисовываем
             return
@@ -320,10 +319,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 msg, col = ((T("IDE теперь работает под {email}", email=now), GREEN) if ok else
                             (T("В IDE вошёл {now}, а не {email}", now=now or T("никто"), email=email), YELLOW))
                 expect = email if ok else None
-                self.ide_unverified = None
             except L.IdeSwitchUnverified as e:
                 msg, col, expect = str(e), YELLOW, email
-                self.ide_unverified = email.lower()  # «○ IDE» с подсказкой, пока IDE не покажет вход
             except Exception as e:
                 msg, col, expect = T("Не удалось сменить аккаунт: {error}", error=e), RED, None
             import time as _t
@@ -420,7 +417,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             if off and summary:
                 summary = (summary[0], FAINT)
             specs.append((key, title, accent, spec(
-                collapsible=True, folded=folded, badge="LOGOUT" if off else plan, ide=mode,
+                collapsible=True, folded=folded, badge="LOGOUT" if off else plan,
+                ide=None if off else mode,  # у LOGOUT нет ни кнопки «→ в …», ни метки IDE (владелец)
                 badge_fg=RED if off else None, dim=off,
                 badge_tip=T("Google просит подтвердить этот аккаунт (Verify your account).\n"
                             "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"

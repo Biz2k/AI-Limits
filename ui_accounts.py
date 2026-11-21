@@ -123,17 +123,15 @@ class AccountsMixin:
             if kind in ide_ident:
                 continue
             email = self.ide_email.get(kind)
-            if kind == "google":
-                present = bool(email) or running
+            if kind == "google":  # IDE без входа и без записи входа — плитки нет (1.5.4, владелец)
+                present = bool(email)
             else:
                 present = self.has_prog.get(kind)
             if not present:
                 continue
             ident = A.ident(kind, email) if email else A.IDE_KEY[kind]
             ide_ident[kind] = ident
-            res = self._google_res(email) if kind == "google" and email else self.parts.get(("ide", kind))
-            if kind == "google" and not email:
-                res = None if self.pending else RuntimeError(T("IDE Antigravity запущена, но вход не выполнен"))
+            res = self._google_res(email) if kind == "google" else self.parts.get(("ide", kind))
             tiles.append((A.IDE_KEY[kind], {"kind": kind, "ident": ident, "email": email, "ide": True,
                                             "title": names.get(ident) or A.PRODUCT[kind], "res": res}))
         # добавленные аккаунты — всегда под своим ключом: после смены аккаунта программы («→ в IDE») плитки
@@ -312,12 +310,9 @@ class AccountsMixin:
         """Метка или кнопка плитки: "current"/"switch" (IDE Antigravity), "current_codex"/"switch_codex" (Codex)."""
         if t["kind"] == "google":
             if t["ide"]:  # IDE закрыта — серое «○ IDE»: при запуске она войдёт этим аккаунтом (1.5.4)
-                if not t["email"]:
-                    return None  # IDE открыта без входа — метки нет
-                if ide_running:
-                    return "current"
-                unv = (getattr(self, "ide_unverified", None) or "") == t["email"].lower()
-                return "current_unverified" if unv else "current_idle"
+                if ide_running:  # открыта; без входа — серое «○ IDE» «открыта, но вход не выполнен»
+                    return "current_nologin" if getattr(self, "ide_nologin", False) else "current"
+                return "current_idle"
             return "switch" if ide_running or L.ide_installed() else None
         suffix = {"chatgpt": "_codex", "claude": "_claude"}[t["kind"]]
         if t["ide"]:
