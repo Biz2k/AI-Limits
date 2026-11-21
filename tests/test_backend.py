@@ -139,7 +139,7 @@ def test_keys():
 # ------------------------------------------------------------------ заголовок версии IDE
 def test_user_agents():
     ide_local.ide_version = lambda: (2, 31, 2)
-    cloud._CC_AGENTS, cloud._CC_AGENT_OK = None, 0
+    cloud._CC_AGENTS, cloud._CC_AGENT_OK = None, {}
     agents = cloud.cc_user_agents()
     assert agents == ["antigravity/hub/2.31.2", "antigravity/hub/2.24.0", "antigravity"], agents
     calls = []
@@ -152,7 +152,22 @@ def test_user_agents():
     real, cloud.http_json = cloud.http_json, fake
     assert cloud.cc_post("/x", "t", {}) == {"ok": 1} and cloud.cc_post("/x", "t", {}) == {"ok": 1}
     assert calls == [agents[0], agents[1], agents[1]], calls
-    cloud._CC_AGENT_OK = 0
+    # отказ одному аккаунту (403 «Verify your account») не переводит другие на прежний заголовок
+    calls.clear()
+
+    def one_bad(url, data=None, headers=None, form=False, method=None):
+        calls.append((headers["Authorization"], headers["User-Agent"]))
+        if headers["Authorization"] == "Bearer bad" and headers["User-Agent"] != agents[-1]:
+            raise RuntimeError("HTTP 403: Verify your account to continue.")
+        return {"ok": 1}
+    cloud._CC_AGENT_OK = {}
+    cloud.http_json = one_bad
+    assert cloud.cc_post("/x", "bad", {}, "bad@example.com") == {"ok": 1}
+    assert cloud.cc_post("/x", "good", {}, "good@example.com") == {"ok": 1}
+    assert cloud.cc_post("/x", "bad", {}, "bad@example.com") == {"ok": 1}
+    assert calls == [("Bearer bad", agents[0]), ("Bearer bad", agents[1]), ("Bearer bad", agents[2]),
+                     ("Bearer good", agents[0]), ("Bearer bad", agents[2])], calls
+    cloud._CC_AGENT_OK = {}
 
     def fail(url, data=None, headers=None, form=False, method=None):
         calls.append("500")
@@ -161,8 +176,8 @@ def test_user_agents():
     n = len(calls)
     expect_error(RuntimeError, lambda: cloud.cc_post("/x", "t", {}))
     assert len(calls) == n + 1  # при ошибке, отличной от 403, заголовок не меняется
-    cloud.http_json, cloud._CC_AGENT_OK = real, 0
-    step("заголовок версии IDE: при 403 берётся следующий и запоминается, при 500 повтора нет")
+    cloud.http_json, cloud._CC_AGENT_OK = real, {}
+    step("заголовок версии IDE: при 403 берётся следующий и запоминается для аккаунта, при 500 повтора нет")
 
 
 # ------------------------------------------------------------------ прямые вызовы Windows
