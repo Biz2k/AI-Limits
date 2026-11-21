@@ -139,8 +139,9 @@ def find_ide_servers(diag=None):
 
 def local_ide_info():
     """Состояние запущенных IDE Antigravity:
-    {"running": bool, "email": str|None, "accounts": {email: {"rows", "plan"}}}."""
-    info = {"running": False, "email": None, "accounts": {}}
+    {"running": bool, "window": bool, "email": str|None, "accounts": {email: {"rows", "plan"}}}.
+    window — открыто окно IDE (1.5.4): без входа IDE не запускает свой language_server, и running остаётся False."""
+    info = {"running": False, "window": False, "email": None, "accounts": {}}
     for srv, us in find_ide_servers():
         info["running"] = True
         email = (us or {}).get("email")
@@ -156,6 +157,10 @@ def local_ide_info():
             ((us.get("planStatus") or {}).get("planInfo") or {}).get("planName", "")
         if rows:
             info["accounts"][email.lower()] = {"rows": rows, "plan": plan}
+    try:
+        info["window"] = info["running"] or bool(_ide_open())
+    except Exception:
+        info["window"] = info["running"]
     return info
 
 

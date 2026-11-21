@@ -313,6 +313,30 @@ def main():
     step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE; плитки остаются на"
          " местах, метка «● IDE» переходит на новый аккаунт; на время сообщения «макс.» скрыто")
 
+    # окно IDE открыто, а входа нет (сервера IDE нет): запись входа (b@) — не аккаунт IDE
+    L.local_ide_info = lambda: {"running": False, "window": True, "email": None, "accounts": {}}
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "antigravity" in app.cards, "нет плитки «IDE без входа»")
+    assert not app.tile_info["b@example.com"]["ide"] and app.cards["b@example.com"].ide_mode == "switch"
+    assert "вход не выполнен" in " ".join(texts(app.cards["antigravity"].outer))
+    assert app.cards["antigravity"].ide_mode is None
+    # IDE закрыта: серое «○ IDE» с подсказкой; после неподтверждённой смены — и об этом
+    L.local_ide_info = lambda: {"running": False, "window": False, "email": None, "accounts": {}}
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "antigravity" not in app.cards, "плитка «IDE без входа» осталась")
+    cb = app.cards["b@example.com"]
+    assert cb.ide_mode == "current_idle" and cb.ide.cget("text") == "○ IDE" and cb.ide.cget("fg") == G.FAINT
+    assert "закрыта" in cb.ide_tip.text and "не подтвердилась" not in cb.ide_tip.text
+    app.ide_unverified = "b@example.com"
+    app.redraw()
+    yield wait()
+    assert cb.ide_mode == "current_unverified" and "не подтвердилась" in cb.ide_tip.text, cb.ide_tip.text
+    L.local_ide_info = fake_ide_info
+    app.refresh()
+    yield wait(10, lambda: not app.loading and app.cards["b@example.com"].ide_mode == "current", "IDE не вернулась")
+    assert app.ide_unverified is None and app.cards["b@example.com"].ide.cget("text") == "● IDE"
+    step("IDE открыта без входа — плитка «вход не выполнен», метки нет; закрыта — серое «○ IDE» с подсказкой")
+
     app.alerted = set()
     fake = [("claude", {"kind": "claude", "ident": "claude:me@example.com", "title": "Claude Code", "ide": True,
                         "res": {"plan": "pro", "limits": rows(85.0, 2.0)}})]
