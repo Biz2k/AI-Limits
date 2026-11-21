@@ -27,7 +27,7 @@ switch the account the Antigravity IDE is signed in to with one click.
   app is signed in to, that app's card simply takes its name.
 - Every account has a name of your choice, unique within the app (by default the part of the email before «@»; if
   taken, with the service in front: "Codex alex"). Rename it by double-clicking the name on its card or in
-  ⚙ → **Manage accounts**, which lists the accounts by service with the email below the name and can delete them.
+  ⚙ → **Manage accounts**, which lists the accounts by service with the email below the name and can delete them; ↻ signs in to an added account again to refresh its sign-in (only the same account is accepted).
 
 **Limits**
 - Weekly and 5-hour limits for Claude Code, Codex (ChatGPT subscription) and each Google account (Gemini), with

@@ -283,6 +283,14 @@ TEXTS = {
          "Google просить підтвердити цей акаунт (Verify your account).\n"
          "Ліміти Gemini недоступні, доки ви не увійдете ним в IDE Antigravity\n"
          "і не підтвердите акаунт."),
+    "Войдите в {email} в открывшемся браузере…":
+        ("Sign in to {email} in the browser that opened…", "Увійдіть у {email} у браузері, що відкрився…"),
+    "в браузере выбран {got}, а не {email} — вход не обновлён":
+        ("{got} was chosen in the browser, not {email} — the sign-in was not updated",
+         "у браузері вибрано {got}, а не {email} — вхід не оновлено"),
+    "Вход «{name}» обновлён": ("Sign-in of “{name}” updated", "Вхід «{name}» оновлено"),
+    "Войти в аккаунт заново — обновить вход":
+        ("Sign in to the account again — refresh the sign-in", "Увійти в акаунт заново — оновити вхід"),
     "IDE Antigravity закрыта. При запуске она войдёт этим аккаунтом.":
         ("The Antigravity IDE is closed. It will sign in with this account when started.",
          "IDE Antigravity закрита. Під час запуску вона увійде цим акаунтом."),
