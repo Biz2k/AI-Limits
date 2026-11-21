@@ -407,7 +407,12 @@ class AccountsMixin:
     # ------------------------------------------------ переименование
     def _rename_entry(self, label, ident, current, on_done=None, font=None):
         """Поле ввода на месте надписи label: Enter или щелчок мимо — сохранить, Esc — отменить.
-        Занятое или пустое имя не применяется: поле остаётся, рядом — сообщение."""
+        Занятое или пустое имя не применяется: поле остаётся, рядом — сообщение.
+        Поле уже открыто (повторный ✎, 1.5.4: раньше — TclError «isn't packed») — только фокус в него."""
+        open_ent = getattr(label, "_rename_ent", None)
+        if open_ent is not None and open_ent.winfo_exists():
+            open_ent.focus_set()
+            return open_ent
         parent = label.master
         var = tk.StringVar(value=current)
         ent = tk.Entry(parent, textvariable=var, bg=CARD_HI, fg=FG, insertbackground=FG, relief="flat",
@@ -452,6 +457,7 @@ class AccountsMixin:
                                                            self.root.focus_get() is not ent and close(True)))
         ent.focus_set()
         ent.select_range(0, "end")
+        label._rename_ent = ent
         self.rename_entry = ent
         return ent
 
