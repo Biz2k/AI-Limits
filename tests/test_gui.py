@@ -265,7 +265,7 @@ def main():
     L.ag_fetch = real_ag
     app.refresh()
     yield wait(10, lambda: not app.loading)
-    assert cbv.badge.cget("text") == "PRO" and cbv.badge.cget("fg") == G.ACCENT["google"] and not cbv.badge_tip.text
+    assert cbv.badge.cget("text") == "PRO" and cbv.badge.cget("fg") != G.RED and not cbv.badge_tip.text
     step("Google просит подтвердить аккаунт — значок LOGOUT красным, полосы и проценты приглушены; потом — как было")
 
     app.open_menu()
@@ -360,6 +360,10 @@ def main():
     assert ca.title.cget("fg") != G.FG and cb.title.cget("fg") == G.FG
     assert ca.rows and ca.rows[0].label.cget("fg") != G.FG and cb.rows[0].label.cget("fg") == G.FG
     assert not app.cards["claude"].quiet                                 # «● Claude Code» — яркая
+    assert ca.badge.cget("fg") != G.ACCENT["google"] and cb.badge.cget("fg") == G.ACCENT["google"]
+    assert ca.rows[0].pct.cget("fg") != G.color_for(ca.rows[0].bar.used, app.warn)    # проценты и полосы — тоже
+    assert ca.rows[0].bar.color == ca.rows[0].pct.cget("fg")
+    assert cb.rows[0].pct.cget("fg") == G.color_for(cb.rows[0].bar.used, app.warn)
     L.local_ide_info = lambda: {"running": False, "window": True, "email": None, "accounts": {}}
     STATE["ide_account"] = None                                          # и записи входа нет — ни плитки, ни метки
     app.refresh()
