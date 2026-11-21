@@ -354,6 +354,12 @@ def main():
     app.refresh()
     yield wait(10, lambda: not app.loading and cb.ide_mode == "current", "нет «● IDE» при новой IDE")
     assert cb.ide.cget("text") == "● IDE" and app.cards["a@example.com"].ide_mode == "switch"
+    # аккаунт не в программе — полоса и белые надписи тусклее; в программе — как были
+    ca = app.cards["a@example.com"]
+    assert ca.quiet and not cb.quiet and cb.strip.cget("bg") == cb.accent and ca.strip.cget("bg") != ca.accent
+    assert ca.title.cget("fg") != G.FG and cb.title.cget("fg") == G.FG
+    assert ca.rows and ca.rows[0].label.cget("fg") != G.FG and cb.rows[0].label.cget("fg") == G.FG
+    assert not app.cards["claude"].quiet                                 # «● Claude Code» — яркая
     L.local_ide_info = lambda: {"running": False, "window": True, "email": None, "accounts": {}}
     STATE["ide_account"] = None                                          # и записи входа нет — ни плитки, ни метки
     app.refresh()
@@ -417,9 +423,9 @@ def main():
     tx, ty = cl.outer.winfo_rootx() + 30, cl.outer.winfo_rooty() + 5
     assert cb.strip.winfo_width() >= 12 and str(cb.strip.cget("cursor")) == "fleur"
     cb.strip_hover(True)
-    assert cb.strip.cget("bg") != cb.accent                             # наведение на полоску — светлее
+    assert cb.strip.cget("bg") != cb.strip_color()                      # наведение на полоску — светлее
     cb.strip_hover(False)
-    assert cb.strip.cget("bg") == cb.accent
+    assert cb.strip.cget("bg") == cb.strip_color()
     bx, by = cb.strip.winfo_rootx() + 5, cb.strip.winfo_rooty() + 20
     app._drag_press(E(x_root=bx, y_root=by), cb)
     app._drag_motion(E(x_root=bx, y_root=by - 3))                       # меньше порога — ещё щелчок

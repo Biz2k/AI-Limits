@@ -18,6 +18,18 @@ def lighter(color, k=0.4):
     return "#%02x%02x%02x" % tuple(round(v + (255 - v) * k) for v in (r, g, b))
 
 
+def mix(color, other, k):
+    """Цвет #rrggbb, смешанный с other на долю k."""
+    a = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(other[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * k) for x, y in zip(a, b))
+
+
+# плитка аккаунта, который сейчас не вошёл ни в одну программу (1.5.4, владелец): полоса и белые надписи тусклее
+DIM_STRIP = 0.55   # доля цвета фона в полосе
+DIM_TEXT = 0.35    # доля цвета фона в надписях
+
+
 def _set(w, **kw):
     """config только для изменившихся параметров: неизменённый виджет не перерисовывается."""
     st = w.__dict__.setdefault("_st", {})
@@ -46,7 +58,8 @@ class RowView:
         top = tk.Frame(self.f, bg=CARD)
         top.pack(fill="x")
         top.columnconfigure(0, weight=1)  # при нехватке ширины сжимается название, а не процент справа
-        tk.Label(top, text=T(name), bg=CARD, fg=FG, font=(FONT, 10), anchor="w").grid(row=0, column=0, sticky="w")
+        self.label = tk.Label(top, text=T(name), bg=CARD, fg=FG, font=(FONT, 10), anchor="w")
+        self.label.grid(row=0, column=0, sticky="w")
         self.time = tk.Label(top, bg=CARD, fg=FAINT if small else "#d3d7df", font=(FONT, 8 if small else 9))
         self.time.grid(row=0, column=2, padx=(0, 8 if small else 10))
         self.rs = tk.Label(top, bg=CARD, fg=FAINT if small else "#b4bac6", font=(FONT, 8 if small else 9))
@@ -67,8 +80,14 @@ class RowView:
                 w.bind("<Button-1>", lambda e: on_click(self.f), add="+")
                 w.config(cursor="hand2")
 
-    def update(self, used, resets_at, seen, warn, dim=False):
-        """dim — аккаунт отключён (Google просит подтвердить его): процент и полоса приглушены."""
+    def update(self, used, resets_at, seen, warn, dim=False, quiet=False):
+        """dim — аккаунт отключён (Google просит подтвердить его): процент и полоса приглушены.
+        quiet — аккаунт не вошёл ни в одну программу: название строки и время сброса тусклее."""
+        fade = (lambda c: mix(c, CARD, DIM_TEXT)) if quiet else (lambda c: c)
+        _set(self.label, fg=fade(FG))
+        if not self.small:
+            _set(self.time, fg=fade("#d3d7df"))
+            _set(self.rs, fg=fade("#b4bac6"))
         if used is None:
             for w in (self.pct, self.seen, self.rs, self.time):
                 _vis(w, False)
@@ -104,7 +123,7 @@ class CardView:
         self.frame = f = tk.Frame(self.outer, bg=CARD, highlightbackground=LINE, highlightthickness=1)
         f.pack(fill="both", expand=True)  # в две колонки карточки одной строки — одной высоты
         # цветная полоска слева — ручка перетаскивания: при наведении светлеет, курсор «переместить»
-        self.accent = accent
+        self.accent, self.quiet = accent, False
         self.strip = tk.Frame(f, bg=accent, width=12, cursor="fleur")
         self.strip.pack(side="left", fill="y")
         self.strip.bind("<Enter>", lambda e: self.strip_hover(True))
@@ -163,13 +182,23 @@ class CardView:
             text += "…"
         _set(self.title, text=text)
 
+    def strip_color(self):
+        """Цвет полосы: у плитки аккаунта не в программе — приглушённый."""
+        return mix(self.accent, CARD, DIM_STRIP) if getattr(self, "quiet", False) else self.accent
+
     def strip_hover(self, on):
         """Подсветка полоски: светлее при наведении и пока плитку тащат."""
         drag = getattr(self.app, "_drag", None) or getattr(self.app, "_dnd", None) or {}
-        self.strip.config(bg=lighter(self.accent) if on or drag.get("card") is self else self.accent)
+        base = self.strip_color()
+        self.strip.config(bg=lighter(base) if on or drag.get("card") is self else base)
 
     def update(self, spec, warn):
         self.collapsible = spec["collapsible"]
+        quiet = spec.get("quiet", False)
+        if quiet != getattr(self, "quiet", False):
+            self.quiet = quiet
+            self.strip.config(bg=self.strip_color())
+        _set(self.title, fg=mix(FG, CARD, DIM_TEXT) if quiet else FG)
         _vis(self.arrow, self.collapsible)
         _set(self.arrow, text="▶" if spec["folded"] else "▼", cursor="hand2" if self.collapsible else "",
              font=(FONT, 10 if spec["folded"] else 9))  # ▶ в этом шрифте мельче ▼ — на пункт крупнее
@@ -221,7 +250,7 @@ class CardView:
             if not names:
                 self.rows_box.config(height=1)  # пустая рамка не держит прежнюю высоту
         for view, (_, used, resets_at, seen) in zip(self.rows, spec["rows"]):
-            view.update(used, resets_at, seen, warn, spec.get("dim", False))
+            view.update(used, resets_at, seen, warn, spec.get("dim", False), quiet)
 
         content_on = bool(msg or names)
         if content_on != self._content_on:
