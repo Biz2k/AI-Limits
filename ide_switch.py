@@ -312,6 +312,9 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
             if line != seen_line or time.time() - seen_at >= 15:  # каждое изменение и не реже раза в 15 с
                 ide_local._ide_log(f"Ожидание {int(began - started)} с (опрос {time.time() - began:.1f} с):", line)
                 seen_line, seen_at = line, time.time()
+            if not servers and ide_local.ide_server_hidden():  # новая IDE: ждать ответа её сервера бессмысленно
+                raise IdeSwitchUnverified(T("IDE запущена; новая версия IDE не даёт проверить вход — "
+                                            "проверьте аккаунт в самой IDE"))
             cur = next((us["email"] for _, us in servers if us and us.get("email")), None)
             state = cur or ("нет входа" if servers else None)
             if not cur:

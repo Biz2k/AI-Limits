@@ -301,6 +301,9 @@ TEXTS = {
     "Сервер временно ограничил запросы — повторю через {min} мин":
         ("The server is temporarily limiting requests — will retry in {min} min",
          "Сервер тимчасово обмежив запити — повторю через {min} хв"),
+    "IDE запущена; новая версия IDE не даёт проверить вход — проверьте аккаунт в самой IDE":
+        ("The IDE is running; the new IDE version does not allow checking the sign-in — check the account in the IDE",
+         "IDE запущена; нова версія IDE не дає перевірити вхід — перевірте акаунт у самій IDE"),
     "Вход не выполнен": ("Sign-in failed", "Вхід не виконано"),
     "неверный ответ Google": ("invalid response from Google", "неправильна відповідь Google"),
     "Вход {email} получен, но Google просит подтвердить аккаунт — ссылка на странице в браузере":

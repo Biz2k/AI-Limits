@@ -349,6 +349,12 @@ def main():
     yield wait(10, lambda: not app.loading and cb.ide_mode == "switch", "«● IDE» у IDE без входа")
     assert "antigravity" not in app.cards and cb.ide.cget("text") == "→ в IDE"
     assert app.cards["a@example.com"].ide_mode == "switch"
+    # сервер новой IDE (ключ скрыт): аккаунт IDE — по записи входа, «● IDE»
+    L.local_ide_info = lambda: {"running": False, "window": True, "hidden": True, "email": None, "accounts": {}}
+    app.refresh()
+    yield wait(10, lambda: not app.loading and cb.ide_mode == "current", "нет «● IDE» при новой IDE")
+    assert cb.ide.cget("text") == "● IDE" and app.cards["a@example.com"].ide_mode == "switch"
+    L.local_ide_info = lambda: {"running": False, "window": True, "email": None, "accounts": {}}
     STATE["ide_account"] = None                                          # и записи входа нет — ни плитки, ни метки
     app.refresh()
     yield wait(10, lambda: not app.loading and cb.ide_mode == "switch", "метка IDE осталась без записи входа")
