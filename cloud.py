@@ -87,7 +87,7 @@ CC_META = {"ideType": "ANTIGRAVITY", "platform": "PLATFORM_UNSPECIFIED", "plugin
 CC_IDE_VERSION_MIN = (2, 24, 0)    # с этой версией группа Gemini приходила 12.11.2026
 CC_USER_AGENT_OLD = "antigravity"  # запасной: принимается всегда, но без лимитов Gemini в сводке
 _CC_AGENTS = None                  # список заголовков (кэш)
-_CC_AGENT_OK = 0                   # номер заголовка, который облако приняло в прошлый раз
+_CC_AGENT_OK = {}                  # аккаунт → номер заголовка, который облако приняло ему в прошлый раз
 
 TIMEOUT = 25
 
@@ -376,17 +376,19 @@ def cc_user_agents():
     return _CC_AGENTS
 
 
-def cc_post(path, token, body):
+def cc_post(path, token, body, key=None):
     """Запрос к облаку Antigravity. Если версию клиента отвергли (HTTP 403) — повтор со следующим заголовком
-    из cc_user_agents(); принятый заголовок запоминается до конца работы программы."""
-    global _CC_AGENT_OK
+    из cc_user_agents(); принятый заголовок запоминается до конца работы программы — **для каждого аккаунта
+    (key) отдельно**: 403 бывает и у одного аккаунта («Verify your account to continue»), и общий запомненный
+    заголовок (1.5.3) переводил все аккаунты на безымянный «antigravity», с которым группы Gemini нет."""
     agents = cc_user_agents()
-    start = _CC_AGENT_OK if _CC_AGENT_OK < len(agents) else 0
+    start = _CC_AGENT_OK.get(key, 0)
+    start = start if start < len(agents) else 0
     for i in range(start, len(agents)):
         try:
             res = http_json(CC_BASE + path, body,
                             headers={"Authorization": "Bearer " + token, "User-Agent": agents[i]})
-            _CC_AGENT_OK = i
+            _CC_AGENT_OK[key] = i
             return res
         except RuntimeError as e:
             if not str(e).startswith("HTTP 403") or i == len(agents) - 1:
@@ -449,17 +451,18 @@ def ag_fetch(acc, all_models=False, local=None):
         return {"plan": li["plan"], "models": li["rows"], "credits": None,
                 "source": "данные IDE Antigravity"}
     token = g_access_token(acc)
-    lca = cc_post("/v1internal:loadCodeAssist", token, {"metadata": CC_META})
+    key = acc["email"].lower()
+    lca = cc_post("/v1internal:loadCodeAssist", token, {"metadata": CC_META}, key)
     project = extract_project(lca) or acc.get("project")
     body = {"project": project} if project else {}
     plan = (lca.get("paidTier") or {}).get("name") or (lca.get("currentTier") or {}).get("name") or ""
     rows, source = None, "облако"
     try:
-        rows = _summary_rows(cc_post("/v1internal:retrieveUserQuotaSummary", token, body))
+        rows = _summary_rows(cc_post("/v1internal:retrieveUserQuotaSummary", token, body, key))
     except Exception:
         pass
     if not rows:
-        rows = _bucket_rows(cc_post("/v1internal:retrieveUserQuota", token, body))
+        rows = _bucket_rows(cc_post("/v1internal:retrieveUserQuota", token, body, key))
         source = "облако · действующий лимит"
     return {"plan": plan, "models": rows, "credits": None, "source": source}
 
