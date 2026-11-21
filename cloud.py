@@ -15,6 +15,7 @@ import webbrowser
 
 import accounts
 import ide_local
+import i18n
 from i18n import T
 import storage
 
@@ -486,27 +487,74 @@ def ag_fetch(acc, all_models=False, local=None):
     return res
 
 
-def validation_url(e):
-    """Ссылка «Verify your account» из отказа облака 403 VALIDATION_REQUIRED (или None)."""
+def validation_links(e):
+    """(ссылка «Verify your account», ссылка «Learn more») из отказа облака 403 VALIDATION_REQUIRED или (None, None).
+    Берутся только адреса Google."""
     try:
         for d in json.loads(getattr(e, "body", "") or "{}").get("error", {}).get("details", []):
-            url = (d.get("metadata") or {}).get("validation_url")
+            meta = d.get("metadata") or {}
+            url = meta.get("validation_url")
             if url and url.startswith("https://accounts.google.com/"):
-                return url
+                more = meta.get("validation_learn_more_url") or ""
+                return url, more if more.startswith("https://support.google.com/") else None
     except (ValueError, AttributeError):
         pass
-    return None
+    return None, None
 
 
-def _login_page(title, text="", link=None):
-    """Страница в браузере после входа Google."""
-    body = f"<h2>{html.escape(title)}</h2>"
+def validation_url(e):
+    return validation_links(e)[0]
+
+
+# страница в браузере после входа Google — в стиле окна программы (цвета ui_theme), на языке программы (1.5.4)
+_PAGE_CSS = """
+:root{--bg:#0e1014;--card:#171a21;--hi:#1d212a;--line:#262b36;--fg:#e8eaef;--muted:#8a91a0;--faint:#5c6372;
+--blue:#5b8def;--green:#3ecf8e;--yellow:#f2c94c;--red:#ff5c5c}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.card{width:100%;max-width:460px;background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:32px 32px 26px;text-align:center;border-left:6px solid var(--accent)}
+.icon{width:56px;height:56px;margin:0 auto 18px;border-radius:50%;display:flex;align-items:center;
+justify-content:center;font-size:28px;font-weight:700;color:var(--accent);background:var(--hi);
+border:2px solid var(--accent)}
+h1{font:600 21px/1.3 "Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;margin:0 0 10px}
+p{margin:0 0 6px;color:var(--muted)}
+.email{color:var(--fg);font-weight:600;word-break:break-all}
+.actions{margin-top:24px}
+.btn{display:inline-block;background:var(--blue);color:#fff;text-decoration:none;font-weight:600;
+padding:10px 22px;border-radius:8px}
+.btn:hover{filter:brightness(1.12)}
+.note{margin-top:10px;font-size:13px;color:var(--faint)}
+.note a{color:var(--blue)}
+.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+"""
+
+
+def _login_page(kind, title, text="", email=None, button=None, note=None):
+    """Страница результата входа Google. kind — ok / warn / error; text может содержать «{email}» — подставляется
+    выделенный email; button — (надпись, адрес); note — (текст, надпись ссылки, адрес) мелко под кнопкой."""
+    accent, icon = {"ok": ("var(--green)", "✓"), "warn": ("var(--yellow)", "!"),
+                    "error": ("var(--red)", "✕")}[kind]
+    e = html.escape
+    body = e(text)
+    if email:
+        body = body.replace(e("{email}"), f"<span class='email'>{e(email)}</span>")
+    parts = [f"<div class='icon'>{icon}</div>", f"<h1>{e(title)}</h1>"]
     if text:
-        body += f"<p>{html.escape(text)}</p>"
-    if link:
-        body += f"<p><a href='{html.escape(link[1], quote=True)}'>{html.escape(link[0])}</a></p>"
-    return ("<!doctype html><meta charset='utf-8'><body style='font-family:sans-serif;max-width:640px;"
-            f"margin:40px auto'>{body}</body>").encode("utf-8")
+        parts.append(f"<p>{body}</p>")
+    if button:
+        parts.append(f"<div class='actions'><a class='btn' href='{e(button[1], quote=True)}'>{e(button[0])}</a>")
+        if note:
+            parts.append(f"<div class='note'>{e(note[0])} <a href='{e(note[2], quote=True)}' target='_blank' "
+                         f"rel='noopener'>{e(note[1])}</a></div>")
+        parts.append("</div>")
+    parts.append("<div class='foot'>AI Limits</div>")
+    return (f"<!doctype html><html lang='{i18n.lang()}'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>AI Limits</title><style>{_PAGE_CSS}</style></head>"
+            f"<body><div class='card' style='--accent:{accent}'>{''.join(parts)}</div></body></html>").encode("utf-8")
 
 
 def ag_login(login_hint=None, expect=None):
@@ -540,7 +588,7 @@ def ag_login(login_hint=None, expect=None):
             http_json(CC_BASE + "/v1internal:retrieveUserQuotaSummary", body,
                       headers={"Authorization": "Bearer " + tok["access_token"], "User-Agent": cc_user_agents()[0]})
         except Exception as e:  # облако недоступно — вход всё равно получен; требует подтверждения — скажем
-            acc["verify_url"] = validation_url(e)
+            acc["verify_url"], result["learn"] = validation_links(e)
         return acc
 
     class H(http.server.BaseHTTPRequestHandler):
@@ -551,17 +599,24 @@ def ag_login(login_hint=None, expect=None):
                 if "code" in q and q.get("state") == state:
                     try:
                         result["acc"] = acc = finish(q["code"], redirect)
-                        page = (_login_page(T("Вход {email} получен, но Google просит подтвердить аккаунт.",
-                                              email=acc["email"]),
-                                            T("Лимиты Gemini недоступны, пока аккаунт не подтверждён."),
-                                            (T("Подтвердить аккаунт в Google"), acc["verify_url"]))
-                                if acc.get("verify_url") else _login_page(T("Готово, можно закрыть вкладку.")))
+                        if acc.get("verify_url"):
+                            learn = result.get("learn")
+                            page = _login_page(
+                                "warn", T("Google просит подтвердить аккаунт"),
+                                T("Вход в {email} выполнен, но лимиты Gemini недоступны, пока аккаунт не подтверждён "
+                                  "в Google.", email="{email}"), acc["email"],
+                                (T("Подтвердить аккаунт"), acc["verify_url"]),
+                                (T("Зачем это нужно —"), T("справка Google"), learn) if learn else None)
+                        else:
+                            page = _login_page("ok", T("Готово"),
+                                               T("Вход в {email} выполнен. Эту вкладку можно закрыть.", email="{email}"),
+                                               acc["email"])
                     except Exception as e:
                         result["fail"] = str(e)
-                        page = _login_page(T("Вход не выполнен: {error}", error=e))
+                        page = _login_page("error", T("Вход не выполнен"), str(e))
                 else:
                     result["fail"] = q.get("error") or T("неверный ответ Google")
-                    page = _login_page(T("Вход не выполнен: {error}", error=result["fail"]))
+                    page = _login_page("error", T("Вход не выполнен"), result["fail"])
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()

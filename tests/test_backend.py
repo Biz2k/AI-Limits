@@ -839,7 +839,8 @@ def test_google_login_page():
         if mode.get("verify"):
             err = RuntimeError("HTTP 403: Verify your account to continue.")
             err.body = json.dumps({"error": {"code": 403, "details": [{"reason": "VALIDATION_REQUIRED", "metadata": {
-                "validation_url": "https://accounts.google.com/v3/signin/continue?plt=fake&x=1"}}]}})
+                "validation_url": "https://accounts.google.com/v3/signin/continue?plt=fake&x=1",
+                "validation_learn_more_url": "https://support.google.com/accounts?p=al_alert"}}]}})
             raise err
         return {"groups": []}
 
@@ -856,19 +857,25 @@ def test_google_login_page():
     try:
         acc = run()
         assert acc == {"email": "v@example.com", "refresh_token": "1//fake-login-refresh", "project": "proj"}, acc
-        assert T("Готово, можно закрыть вкладку.") in pages[0], pages
+        assert T("Готово") in pages[0] and "v@example.com" in pages[0] and "class='card'" in pages[0], pages
         mode["verify"] = True                                              # Google требует подтвердить аккаунт
         acc = run(login_hint="v@example.com", expect="v@example.com")
         assert mode["hint"] == "v@example.com" and acc["verify_url"].startswith("https://accounts.google.com/")
-        assert T("Готово, можно закрыть вкладку.") not in pages[0]
-        assert "https://accounts.google.com/v3/signin/continue?plt=fake&amp;x=1" in pages[0], pages[0]
+        assert T("Google просит подтвердить аккаунт") in pages[0] and "class='btn'" in pages[0]
+        assert "href='https://accounts.google.com/v3/signin/continue?plt=fake&amp;x=1'" in pages[0], pages[0]
+        assert "support.google.com/accounts?p=al_alert" in pages[0]       # «справка Google» под кнопкой
         mode["verify"] = False
         msg = expect_error(RuntimeError, lambda: run(expect="other@example.com"))  # выбран другой аккаунт
         assert "other@example.com" in msg and "не обновлён" in msg or "not updated" in msg, msg
-        assert T("Готово, можно закрыть вкладку.") not in pages[0] and "other@example.com" in pages[0]
+        assert T("Вход не выполнен") in pages[0] and "other@example.com" in pages[0]
         mode["no_refresh"] = True                                          # токена нет — и «Готово» нет
         expect_error(RuntimeError, lambda: run())
-        assert T("Готово, можно закрыть вкладку.") not in pages[0], pages[0]
+        assert T("Вход не выполнен") in pages[0], pages[0]
+        mode["no_refresh"] = False
+        i18n.set_lang("en")                                                # страница — на языке программы
+        run()
+        assert "<html lang='en'>" in pages[0] and "Signed in to" in pages[0] and "You can close this tab" in pages[0]
+        i18n.set_lang("ru")
     finally:
         cloud.webbrowser.open, cloud.http_json, cloud.G_CLIENT_ID, cloud.G_CLIENT_SECRET = real
     step("вход Google: «Готово» в браузере — только после получения токена и email; требует подтверждения — "
