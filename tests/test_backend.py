@@ -811,6 +811,70 @@ def test_translations():
     step(f"переводы: {len(used)} строк интерфейса, у каждой есть английский и украинский вариант")
 
 
+# ------------------------------------------------------------------ вход Google: страница «Готово» — только после токена
+def test_google_login_page():
+    import threading
+    import urllib.parse
+    import urllib.request
+    T = i18n.T
+    pages, threads, mode = [], [], {}
+
+    def fake_open(url):  # «браузер»: Google сразу возвращает его на 127.0.0.1 с кодом
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+        mode["hint"] = q.get("login_hint", [None])[0]
+        cb = q["redirect_uri"][0] + "?" + urllib.parse.urlencode({"code": "c1", "state": q["state"][0]})
+        th = threading.Thread(target=lambda: pages.append(urllib.request.urlopen(cb, timeout=20).read().decode()))
+        th.start()
+        threads.append(th)
+
+    def fake_http(url, data=None, headers=None, form=False, method=None):
+        if url == cloud.G_TOKEN_URL:
+            if mode.get("no_refresh"):
+                return {"access_token": "a"}
+            return {"access_token": "a", "refresh_token": "1//fake-login-refresh"}
+        if "userinfo" in url:
+            return {"email": "v@example.com"}
+        if "loadCodeAssist" in url:
+            return {"cloudaicompanionProject": "proj"}
+        if mode.get("verify"):
+            err = RuntimeError("HTTP 403: Verify your account to continue.")
+            err.body = json.dumps({"error": {"code": 403, "details": [{"reason": "VALIDATION_REQUIRED", "metadata": {
+                "validation_url": "https://accounts.google.com/v3/signin/continue?plt=fake&x=1"}}]}})
+            raise err
+        return {"groups": []}
+
+    real = (cloud.webbrowser.open, cloud.http_json, cloud.G_CLIENT_ID, cloud.G_CLIENT_SECRET)
+    cloud.webbrowser.open, cloud.http_json = fake_open, fake_http
+    cloud.G_CLIENT_ID = cloud.G_CLIENT_SECRET = "x"
+
+    def run(**kw):
+        del pages[:], threads[:]
+        try:
+            return cloud.ag_login(**kw)
+        finally:
+            [th.join(10) for th in threads]
+    try:
+        acc = run()
+        assert acc == {"email": "v@example.com", "refresh_token": "1//fake-login-refresh", "project": "proj"}, acc
+        assert T("Готово, можно закрыть вкладку.") in pages[0], pages
+        mode["verify"] = True                                              # Google требует подтвердить аккаунт
+        acc = run(login_hint="v@example.com", expect="v@example.com")
+        assert mode["hint"] == "v@example.com" and acc["verify_url"].startswith("https://accounts.google.com/")
+        assert T("Готово, можно закрыть вкладку.") not in pages[0]
+        assert "https://accounts.google.com/v3/signin/continue?plt=fake&amp;x=1" in pages[0], pages[0]
+        mode["verify"] = False
+        msg = expect_error(RuntimeError, lambda: run(expect="other@example.com"))  # выбран другой аккаунт
+        assert "other@example.com" in msg and "не обновлён" in msg or "not updated" in msg, msg
+        assert T("Готово, можно закрыть вкладку.") not in pages[0] and "other@example.com" in pages[0]
+        mode["no_refresh"] = True                                          # токена нет — и «Готово» нет
+        expect_error(RuntimeError, lambda: run())
+        assert T("Готово, можно закрыть вкладку.") not in pages[0], pages[0]
+    finally:
+        cloud.webbrowser.open, cloud.http_json, cloud.G_CLIENT_ID, cloud.G_CLIENT_SECRET = real
+    step("вход Google: «Готово» в браузере — только после получения токена и email; требует подтверждения — "
+         "ссылка Google на странице; другой аккаунт или нет токена — ошибка на странице")
+
+
 def main():
     print("Проверка логики (вымышленные данные, папка", TMP + ")")
     test_dpapi()
@@ -823,6 +887,7 @@ def main():
     test_restore_command()
     test_switch()
     test_codex()
+    test_google_login_page()
     test_accounts()
     test_codex_switch()
     test_claude_switch()

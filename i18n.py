@@ -288,6 +288,17 @@ TEXTS = {
     "в браузере выбран {got}, а не {email} — вход не обновлён":
         ("{got} was chosen in the browser, not {email} — the sign-in was not updated",
          "у браузері вибрано {got}, а не {email} — вхід не оновлено"),
+    "Вход {email} получен, но Google просит подтвердить аккаунт.":
+        ("Signed in to {email}, but Google asks to verify the account.",
+         "Вхід {email} отримано, але Google просить підтвердити акаунт."),
+    "Лимиты Gemini недоступны, пока аккаунт не подтверждён.":
+        ("Gemini limits are unavailable until the account is verified.",
+         "Ліміти Gemini недоступні, доки акаунт не підтверджено."),
+    "Подтвердить аккаунт в Google": ("Verify the account at Google", "Підтвердити акаунт у Google"),
+    "неверный ответ Google": ("invalid response from Google", "неправильна відповідь Google"),
+    "Вход {email} получен, но Google просит подтвердить аккаунт — ссылка на странице в браузере":
+        ("Signed in to {email}, but Google asks to verify the account — the link is on the page in the browser",
+         "Вхід {email} отримано, але Google просить підтвердити акаунт — посилання на сторінці в браузері"),
     "Вход «{name}» обновлён": ("Sign-in of “{name}” updated", "Вхід «{name}» оновлено"),
     "Войти в аккаунт заново — обновить вход":
         ("Sign in to the account again — refresh the sign-in", "Увійти в акаунт заново — оновити вхід"),
