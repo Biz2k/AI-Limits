@@ -287,7 +287,14 @@ class AccountsMixin:
     def switch_mode(self, t, ide_running):
         """Метка или кнопка плитки: "current"/"switch" (IDE Antigravity), "current_codex"/"switch_codex" (Codex)."""
         if t["kind"] == "google":
-            return "current" if t["ide"] else ("switch" if ide_running or L.ide_installed() else None)
+            if t["ide"]:  # IDE закрыта — серое «○ IDE»: при запуске она войдёт этим аккаунтом (1.5.4)
+                if not t["email"]:
+                    return None  # IDE открыта без входа — метки нет
+                if ide_running:
+                    return "current"
+                unv = (getattr(self, "ide_unverified", None) or "") == t["email"].lower()
+                return "current_unverified" if unv else "current_idle"
+            return "switch" if ide_running or L.ide_installed() else None
         suffix = {"chatgpt": "_codex", "claude": "_claude"}[t["kind"]]
         if t["ide"]:
             return "current" + suffix
