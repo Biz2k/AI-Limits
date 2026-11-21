@@ -246,7 +246,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             self.ide_running = bool(val.get("running") or val.get("window"))
             if val.get("email"):  # запущенная IDE знает свой аккаунт точнее записи входа
                 self.ide_email["google"] = val["email"]
-            # окно IDE открыто, а входа нет (1.5.4): у аккаунта записи входа — серое «○ IDE», отдельной плитки нет
+            # окно IDE открыто, а входа нет (1.5.4): у аккаунта записи входа — «→ в IDE», отдельной плитки нет
             self.ide_nologin = self.ide_running and not val.get("email")
         elif key[0] == "google" or key == ("ide", "google"):
             email = key[1] if key[0] == "google" else (self.ide_email.get("google") or "")
