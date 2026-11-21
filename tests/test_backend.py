@@ -217,6 +217,7 @@ def fake_ide():
     winapi._wincred_write = write
     winapi._wincred_delete = lambda t: STORE.update(blob=None)
     ide_local._ide_running = lambda: IDE["run"]
+    ide_local.ide_server_hidden = lambda: IDE.get("hidden", False)  # настоящую IDE владельца не трогаем
     ide_local._ide_open = lambda: IDE["run"]
     ide_local.find_ide_executable = lambda: r"C:\fake\Antigravity.exe"
     ide_local.stop_ide = lambda timeout=10: (IDE.update(run=False), LOG.append("stop"))
@@ -315,6 +316,13 @@ def test_switch():
         except ide_switch.IdeSwitchUnverified:
             pass
         assert b"new@example.com" in STORE["blob"]
+
+        # сервер новой IDE (ключ скрыт) -> сразу «проверить нельзя», без 90 с ожидания и без отката
+        IDE["hidden"], began = True, time.time()
+        err = expect_error(ide_switch.IdeSwitchUnverified, lambda: ide_switch.ide_switch_account("new@example.com",
+                                                                                               timeout=60))
+        assert time.time() - began < 10 and "новая версия IDE" in err and b"new@example.com" in STORE["blob"], err
+        IDE["hidden"] = False
 
         # IDE показала другой аккаунт -> откат
         STORE["blob"] = cred("old@example.com")

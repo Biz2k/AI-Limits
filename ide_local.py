@@ -69,6 +69,18 @@ class IdeServer:
                                                         "extensionName": "antigravity", "locale": "en"}})
 
 
+def ide_server_hidden():
+    """Запущен сервер IDE Antigravity новой версии (с 21.11.2026: `--read_host_bridge_token_from_stdin`), ключ
+    которого (CSRF) не виден в командной строке, — спросить у него аккаунт нельзя (1.5.4)."""
+    if os.name != "nt":
+        return False
+    try:
+        return any("--override_ide_name antigravity" in (p["cmd"] or "") and "--csrf_token" not in (p["cmd"] or "")
+                   for p in _ide_ls_processes())
+    except Exception:
+        return False
+
+
 def find_ide_servers(diag=None):
     """Серверы запущенных IDE Antigravity: [(IdeServer, userStatus | None)].
     diag — необязательный список: в него дописываются строки о том, что найдено (для журнала смены аккаунта).
@@ -92,6 +104,9 @@ def find_ide_servers(diag=None):
         m = re.search(r"--csrf_token[ =](\S+)", cmd)
         if not cmd:
             note(f"процесс {pid}: командная строка недоступна")
+            continue
+        if "--override_ide_name antigravity" in cmd and not m:
+            note(f"процесс {pid}: сервер IDE новой версии, ключ скрыт — спросить аккаунт нельзя")
             continue
         if not m or "--override_ide_name antigravity" not in cmd:
             foreign += 1
@@ -161,6 +176,8 @@ def local_ide_info():
         info["window"] = info["running"] or bool(_ide_open())
     except Exception:
         info["window"] = info["running"]
+    # сервер новой IDE не отвечает без скрытого ключа — аккаунт IDE тогда берётся из записи её входа (окно)
+    info["hidden"] = not info["running"] and ide_server_hidden()
     return info
 
 

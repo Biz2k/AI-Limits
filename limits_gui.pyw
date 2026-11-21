@@ -264,11 +264,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         if key == "local":
             val = val if isinstance(val, dict) else {}
             self.ide_local = val
-            self.ide_running = bool(val.get("running") or val.get("window"))
+            self.ide_running = bool(val.get("running") or val.get("window") or val.get("hidden"))
             if val.get("email"):  # запущенная IDE знает свой аккаунт точнее записи входа
                 self.ide_email["google"] = val["email"]
             # окно IDE открыто, а входа нет (1.5.4): у аккаунта записи входа — «→ в IDE», отдельной плитки нет
-            self.ide_nologin = self.ide_running and not val.get("email")
+            # сервер новой IDE (ключ скрыт) спросить нельзя — аккаунт IDE = запись входа, «● IDE» как обычно
+            self.ide_nologin = self.ide_running and not val.get("email") and not val.get("hidden")
         elif key[0] == "google" or key == ("ide", "google"):
             email = key[1] if key[0] == "google" else (self.ide_email.get("google") or "")
             self.parts[key] = self._merge(email, val)
