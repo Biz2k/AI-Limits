@@ -188,10 +188,7 @@ class CardView:
         if mode != self.ide_mode:
             self.ide_mode = mode
             prog = (mode or "").partition("_")[2]
-            if prog in ("idle", "nologin"):  # IDE закрыта или открыта без входа: серое «○ IDE» без подсказки (1.5.4)
-                self.ide.config(text="○ IDE", bg=CARD, fg=FAINT, font=(FONT, 9, "bold"), cursor="", padx=1)
-                self.ide_tip.text = ""
-            elif mode and mode.startswith("current"):
+            if mode and mode.startswith("current"):
                 # «● Codex» / «● Claude Code» (1.5.4, владелец: рядом с «→ в Codex» надпись «IDE» путала)
                 self.ide.config(text={"codex": "● Codex", "claude": "● Claude Code"}.get(prog, "● IDE"),
                                 bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
