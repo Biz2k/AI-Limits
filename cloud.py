@@ -518,6 +518,21 @@ def validation_url(e):
     return validation_links(e)[0]
 
 
+def account_problem(access_token, email):
+    """Проверка аккаунта Google в облаке перед «→ в IDE» (1.5.4): Google требует подтвердить аккаунт —
+    текст причины; иначе (в том числе облако недоступно) — None, переключению не мешаем."""
+    try:
+        lca = cc_post("/v1internal:loadCodeAssist", access_token, {"metadata": CC_META}, email.lower())
+        project = extract_project(lca)
+        http_json(CC_BASE + "/v1internal:retrieveUserQuotaSummary", {"project": project} if project else {},
+                  headers={"Authorization": "Bearer " + access_token, "User-Agent": cc_user_agents()[0]})
+    except Exception as e:
+        if validation_url(e) or "VALIDATION_REQUIRED" in (getattr(e, "body", "") or ""):
+            return T("Google просит подтвердить аккаунт {email} — переключение отменено. Войдите в него заново "
+                     "кнопкой ↻ в «Управлении аккаунтами»", email=email)
+    return None
+
+
 # страница в браузере после входа Google — в стиле окна программы (цвета ui_theme), на языке программы (1.5.4)
 _PAGE_CSS = """
 :root{--bg:#0e1014;--card:#171a21;--hi:#1d212a;--line:#262b36;--fg:#e8eaef;--muted:#8a91a0;--faint:#5c6372;

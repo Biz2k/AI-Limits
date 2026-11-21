@@ -1,5 +1,6 @@
 """Запущенная IDE Antigravity: её локальный сервер, лимиты из IDE, запуск и закрытие."""
 import datetime as dt
+import glob
 import json
 import os
 import time
@@ -69,14 +70,37 @@ class IdeServer:
                                                         "extensionName": "antigravity", "locale": "en"}})
 
 
+def hub_dir():
+    """Папка, куда сервер новой IDE (с 21.11.2026) пишет hub_<порт>.json: pid, httpsPort, httpPort, csrfToken."""
+    return os.path.join(os.path.expanduser("~"), ".gemini", "antigravity", "daemon")
+
+
+def _hub_info(pid):
+    """Ключ и порты сервера новой IDE по его PID из hub_<порт>.json (решение владельца 21.11.2026: ключ
+    в командной строке больше не виден, без него сервер не отвечает). Нет файла — None."""
+    try:
+        files = sorted(glob.glob(os.path.join(hub_dir(), "hub_*.json")), key=os.path.getmtime, reverse=True)
+    except OSError:
+        return None
+    for f in files[:30]:  # старые файлы IDE не удаляет — свежие первыми
+        try:
+            with open(f, encoding="utf-8") as fh:
+                j = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if j.get("pid") == pid and j.get("csrfToken"):
+            return j
+    return None
+
+
 def ide_server_hidden():
-    """Запущен сервер IDE Antigravity новой версии (с 21.11.2026: `--read_host_bridge_token_from_stdin`), ключ
-    которого (CSRF) не виден в командной строке, — спросить у него аккаунт нельзя (1.5.4)."""
+    """Запущен сервер новой IDE, ключ которого не найден ни в командной строке, ни в hub_<порт>.json, — спросить
+    у него аккаунт нельзя (1.5.4)."""
     if os.name != "nt":
         return False
     try:
         return any("--override_ide_name antigravity" in (p["cmd"] or "") and "--csrf_token" not in (p["cmd"] or "")
-                   for p in _ide_ls_processes())
+                   and not _hub_info(p["id"]) for p in _ide_ls_processes())
     except Exception:
         return False
 
@@ -105,13 +129,16 @@ def find_ide_servers(diag=None):
         if not cmd:
             note(f"процесс {pid}: командная строка недоступна")
             continue
-        if "--override_ide_name antigravity" in cmd and not m:
-            note(f"процесс {pid}: сервер IDE новой версии, ключ скрыт — спросить аккаунт нельзя")
-            continue
-        if not m or "--override_ide_name antigravity" not in cmd:
+        hub = None
+        if "--override_ide_name antigravity" in cmd and not m:  # новая IDE: ключ и порты — в hub_<порт>.json
+            hub = _hub_info(pid)
+            if not hub:
+                note(f"процесс {pid}: сервер IDE новой версии, ключ не найден — спросить аккаунт нельзя")
+                continue
+        elif not m or "--override_ide_name antigravity" not in cmd:
             foreign += 1
             continue
-        csrf, seen = m.group(1), []
+        csrf, seen = (hub["csrfToken"] if hub else m.group(1)), []
         known = _IDE_PORTS.get(pid)
         if known and known[0] == csrf:  # порт известен с прошлого раза — таблицу соединений не читаем
             srv = IdeServer(known[1], csrf)
@@ -126,6 +153,26 @@ def find_ide_servers(diag=None):
                 found.append((srv, us))
                 continue
             _IDE_PORTS.pop(pid, None)
+        if hub:  # порты известны из файла — таблицу соединений не читаем
+            for port, scheme in ((hub.get("httpsPort"), "https"), (hub.get("httpPort"), "http")):
+                if not port:
+                    continue
+                srv = IdeServer(port, csrf)
+                srv.scheme = scheme
+                try:
+                    st = srv.status()
+                    why = "не отвечает"
+                except Exception as e:
+                    st, why = None, f"ошибка {type(e).__name__}: {str(e)[:60]}"
+                if st is not None:
+                    us = (st or {}).get("userStatus")
+                    seen.append(f"{port} — " + (f"вход {us['email']}" if us and us.get("email") else "входа нет"))
+                    found.append((srv, us))
+                    _IDE_PORTS[pid] = (csrf, port, scheme)
+                    break
+                seen.append(f"{port} — {why}")
+            note(f"процесс {pid} (новая IDE): " + "; ".join(seen))
+            continue
         if table is None:
             try:
                 table = winapi._win_local_ports()

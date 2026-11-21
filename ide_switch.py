@@ -264,6 +264,11 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         raise RuntimeError(T("Не удалось обновить токен для {email}: {error}", email=target_email, error=e)) from None
     if not token_resp.get("access_token"):
         raise RuntimeError(T("Google не вернул access_token для {email}", email=target_email))
+    if not bad_token:  # Google требует подтвердить аккаунт — IDE с ним не войдёт: не закрываем её зря (1.5.4)
+        problem = cloud.account_problem(token_resp["access_token"], acc["email"])
+        if problem:
+            ide_local._ide_log("Переключение отменено:", problem)
+            raise RuntimeError(problem)
     if bad_token:
         ide_local._ide_log("ПРОВЕРКА ОТКАТА: в IDE подставляется заведомо негодный токен")
         token_resp = dict(token_resp, access_token="ai-limits-rollback-test")
