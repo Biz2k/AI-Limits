@@ -88,6 +88,7 @@ CC_IDE_VERSION_MIN = (2, 24, 0)    # с этой версией группа Gem
 CC_USER_AGENT_OLD = "antigravity"  # запасной: принимается всегда, но без лимитов Gemini в сводке
 _CC_AGENTS = None                  # список заголовков (кэш)
 _CC_AGENT_OK = {}                  # аккаунт → номер заголовка, который облако приняло ему в прошлый раз
+_CC_VERIFY = set()                 # аккаунты, которым облако ответило 403 «Verify your account to continue»
 
 TIMEOUT = 25
 
@@ -380,19 +381,30 @@ def cc_post(path, token, body, key=None):
     """Запрос к облаку Antigravity. Если версию клиента отвергли (HTTP 403) — повтор со следующим заголовком
     из cc_user_agents(); принятый заголовок запоминается до конца работы программы — **для каждого аккаунта
     (key) отдельно**: 403 бывает и у одного аккаунта («Verify your account to continue»), и общий запомненный
-    заголовок (1.5.3) переводил все аккаунты на безымянный «antigravity», с которым группы Gemini нет."""
+    заголовок (1.5.3) переводил все аккаунты на безымянный «antigravity», с которым группы Gemini нет.
+    Отказ «Verify your account» (1.5.4) — Google просит подтвердить аккаунт: аккаунт попадает в _CC_VERIFY, а
+    запасной заголовок не запоминается — в следующий раз снова пробуется заголовок с версией IDE (вдруг уже
+    подтвердили); первый принятый без этого отказа запрос убирает аккаунт из _CC_VERIFY."""
     agents = cc_user_agents()
     start = _CC_AGENT_OK.get(key, 0)
     start = start if start < len(agents) else 0
+    verify = False
     for i in range(start, len(agents)):
         try:
             res = http_json(CC_BASE + path, body,
                             headers={"Authorization": "Bearer " + token, "User-Agent": agents[i]})
-            _CC_AGENT_OK[key] = i
+            if verify:
+                _CC_VERIFY.add(key)
+            else:
+                _CC_AGENT_OK[key] = i
+                _CC_VERIFY.discard(key)
             return res
         except RuntimeError as e:
             if not str(e).startswith("HTTP 403") or i == len(agents) - 1:
+                if verify:
+                    _CC_VERIFY.add(key)
                 raise
+            verify = verify or "verify your account" in str(e).lower()
 
 
 def extract_project(resp):
@@ -461,10 +473,14 @@ def ag_fetch(acc, all_models=False, local=None):
         rows = _summary_rows(cc_post("/v1internal:retrieveUserQuotaSummary", token, body, key))
     except Exception:
         pass
+    verify = key in _CC_VERIFY  # Google просит подтвердить аккаунт — в окне значок LOGOUT (1.5.4)
     if not rows:
         rows = _bucket_rows(cc_post("/v1internal:retrieveUserQuota", token, body, key))
         source = "облако · действующий лимит"
-    return {"plan": plan, "models": rows, "credits": None, "source": source}
+    res = {"plan": plan, "models": rows, "credits": None, "source": source}
+    if verify:
+        res["verify"] = True
+    return res
 
 
 def ag_login():

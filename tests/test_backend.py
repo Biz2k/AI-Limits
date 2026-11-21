@@ -160,13 +160,18 @@ def test_user_agents():
         if headers["Authorization"] == "Bearer bad" and headers["User-Agent"] != agents[-1]:
             raise RuntimeError("HTTP 403: Verify your account to continue.")
         return {"ok": 1}
-    cloud._CC_AGENT_OK = {}
+    cloud._CC_AGENT_OK, cloud._CC_VERIFY = {}, set()
     cloud.http_json = one_bad
     assert cloud.cc_post("/x", "bad", {}, "bad@example.com") == {"ok": 1}
     assert cloud.cc_post("/x", "good", {}, "good@example.com") == {"ok": 1}
     assert cloud.cc_post("/x", "bad", {}, "bad@example.com") == {"ok": 1}
+    # «Verify your account» — аккаунт помечен, запасной заголовок не запоминается (в следующий раз — снова с версией)
     assert calls == [("Bearer bad", agents[0]), ("Bearer bad", agents[1]), ("Bearer bad", agents[2]),
-                     ("Bearer good", agents[0]), ("Bearer bad", agents[2])], calls
+                     ("Bearer good", agents[0]),
+                     ("Bearer bad", agents[0]), ("Bearer bad", agents[1]), ("Bearer bad", agents[2])], calls
+    assert cloud._CC_VERIFY == {"bad@example.com"}, cloud._CC_VERIFY
+    cloud.http_json = lambda *a, **k: {"ok": 1}                          # подтвердили — пометка снимается
+    assert cloud.cc_post("/x", "bad", {}, "bad@example.com") == {"ok": 1} and not cloud._CC_VERIFY
     cloud._CC_AGENT_OK = {}
 
     def fail(url, data=None, headers=None, form=False, method=None):

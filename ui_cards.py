@@ -67,14 +67,15 @@ class RowView:
                 w.bind("<Button-1>", lambda e: on_click(self.f), add="+")
                 w.config(cursor="hand2")
 
-    def update(self, used, resets_at, seen, warn):
+    def update(self, used, resets_at, seen, warn, dim=False):
+        """dim — аккаунт отключён (Google просит подтвердить его): процент и полоса приглушены."""
         if used is None:
             for w in (self.pct, self.seen, self.rs, self.time):
                 _vis(w, False)
             _vis(self.nodata, True)
             self.bar.set(0, FAINT)
             return
-        col = color_for(used, warn)
+        col = FAINT if dim else color_for(used, warn)
         _vis(self.nodata, False)
         _set(self.pct, text=f"{used:.0f}%", fg=col)
         _vis(self.pct, True)
@@ -128,6 +129,7 @@ class CardView:
         self.title.grid(row=0, column=1)
         self.badge = tk.Label(h, bg=CARD_HI, fg=accent, font=(FONT, 8, "bold"), padx=7, pady=1)
         self.badge.grid(row=0, column=2, padx=8)
+        self.badge_tip = Tooltip(self.badge, "")
         self.summary = tk.Label(h, bg=CARD, font=(FONT, 10, "bold"))
         self.summary.grid(row=0, column=4, padx=(0, 8))
         self.ide = tk.Label(h, bg=CARD)
@@ -175,7 +177,8 @@ class CardView:
             self.full_title = spec["title"]
             self.fit_title()
         if spec["badge"]:
-            _set(self.badge, text=spec["badge"].upper())
+            _set(self.badge, text=spec["badge"].upper(), fg=spec.get("badge_fg") or self.accent)
+        self.badge_tip.text = spec.get("badge_tip") or ""
         _vis(self.badge, bool(spec["badge"]))
         if spec["summary"]:
             _set(self.summary, text=spec["summary"][0], fg=spec["summary"][1])
@@ -186,7 +189,9 @@ class CardView:
             self.ide_mode = mode
             prog = (mode or "").partition("_")[2]
             if mode and mode.startswith("current"):
-                self.ide.config(text="● IDE", bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
+                # «● Codex» / «● Claude Code» (1.5.4, владелец: рядом с «→ в Codex» надпись «IDE» путала)
+                self.ide.config(text={"codex": "● Codex", "claude": "● Claude Code"}.get(prog, "● IDE"),
+                                bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
                 self.ide_tip.text = {"codex": T("Этот аккаунт сейчас вошёл в Codex"),
                                      "claude": T("Этот аккаунт сейчас вошёл в Claude Code")}.get(
                                          prog, T("Этот аккаунт сейчас вошёл в IDE Antigravity"))
@@ -216,7 +221,7 @@ class CardView:
             if not names:
                 self.rows_box.config(height=1)  # пустая рамка не держит прежнюю высоту
         for view, (_, used, resets_at, seen) in zip(self.rows, spec["rows"]):
-            view.update(used, resets_at, seen, warn)
+            view.update(used, resets_at, seen, warn, spec.get("dim", False))
 
         content_on = bool(msg or names)
         if content_on != self._content_on:

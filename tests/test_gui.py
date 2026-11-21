@@ -222,6 +222,23 @@ def main():
     assert app.cards["b@example.com"].badge.cget("text") == "PRO"
     step("бесплатный тариф Google («Antigravity Starter Quota») — значок FREE")
 
+    L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), verify=True) if acc["email"] == "b@example.com" \
+        else real_ag(acc, a, l)
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    cbv = app.cards["b@example.com"]
+    assert cbv.badge.cget("text") == "LOGOUT" and cbv.badge.cget("fg") == G.RED, cbv.badge.cget("text")
+    assert "Verify your account" in cbv.badge_tip.text
+    assert all(r.bar.color == G.FAINT and r.pct.cget("fg") == G.FAINT for r in cbv.rows if r.bar.used), \
+        [(r.bar.color, r.pct.cget("fg")) for r in cbv.rows]
+    ca = app.cards["a@example.com"]
+    assert ca.badge.cget("fg") == G.ACCENT["google"] and any(r.bar.color != G.FAINT for r in ca.rows if r.bar.used)
+    L.ag_fetch = real_ag
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert cbv.badge.cget("text") == "PRO" and cbv.badge.cget("fg") == G.ACCENT["google"] and not cbv.badge_tip.text
+    step("Google просит подтвердить аккаунт — значок LOGOUT красным, полосы и проценты приглушены; потом — как было")
+
     app.open_menu()
     yield wait(0.5)
     assert float(app.menu_win.attributes("-alpha")) > 0.99            # проявилось до конца
@@ -628,7 +645,8 @@ def main():
     assert t2["title"] == "second" and t2["res"]["limits"][0]["used"] == 30.0 and not t2["ide"]
     c3 = app.cards["claude:second@example.com"]
     assert c3.ide_mode == "switch_claude" and c3.ide.cget("text") == "→ в Claude", (c3.ide_mode, c3.ide.cget("text"))
-    assert app.cards["claude"].ide_mode == "current_claude"           # недобавленный аккаунт Claude Code — «● IDE»
+    assert app.cards["claude"].ide_mode == "current_claude"           # недобавленный аккаунт Claude Code
+    assert app.cards["claude"].ide.cget("text") == "● Claude Code", app.cards["claude"].ide.cget("text")
     real_cl = ui_accounts.CL.switch
     got = []
     ui_accounts.CL.switch = lambda p, on_status=None: got.append(p["email"]) or {
@@ -659,7 +677,8 @@ def main():
     c2 = app.cards["codex:cx2@example.com"]
     assert c2.ide_mode == "switch_codex" and c2.ide.cget("text") == "→ в Codex", (c2.ide_mode, c2.ide.cget("text"))
     assert app.cards["codex:cx@example.com"].ide_mode == "current_codex"
-    assert app.cards["codex:cx@example.com"].ide.cget("text") == "● IDE"
+    assert app.cards["codex:cx@example.com"].ide.cget("text") == "● Codex"
+    assert app.cards["a@example.com"].ide.cget("text") in ("● IDE", "→ в IDE")
     assert c2.ide.cget("bg") == app.cards["a@example.com"].ide.cget("bg")  # одного вида с «→ в IDE»
     switched = []
     real_switch = ui_accounts.CX.switch
@@ -680,7 +699,7 @@ def main():
     app.status_sticky = 0
     app.refresh()
     yield wait(10, lambda: not app.loading and "codex:cx2@example.com" not in app.cards, "плитка не убралась")
-    step("«→ в Codex» у другого аккаунта ChatGPT (вид как у «→ в IDE»), подтверждение, смена; у текущего — «● IDE»")
+    step("«→ в Codex» у другого аккаунта ChatGPT (вид как у «→ в IDE»), подтверждение, смена; у текущего — «● Codex»")
 
     # удаление: профиль и его папка, имя; аккаунт программы удалить нельзя
     prof = next(p for p in accounts.load_profiles() if p["kind"] == "claude")
