@@ -266,6 +266,33 @@ def finish_login(p, timeout=LOGIN_TIMEOUT, cancelled=None):
     return {k: v for k, v in p.items() if not k.startswith("_")}
 
 
+def relogin_profile(old, new):
+    """Повторный вход в добавленный профиль (1.5.4): вход из новой папки new (после finish_login) переносится
+    в папку профиля old, данные профиля обновляются; папка new удаляется в любом случае. Вошли в другой
+    аккаунт — RuntimeError, профиль old не тронут."""
+    newdir = os.path.join(profiles_dir(), new["dir"])
+    try:
+        if ident(new["kind"], new["email"]) != ident(old["kind"], old["email"]):
+            raise RuntimeError(T("в браузере выбран {got}, а не {email} — вход не обновлён",
+                                 got=new["email"], email=old["email"]))
+        olddir = os.path.join(profiles_dir(), old["dir"])
+        os.makedirs(olddir, exist_ok=True)
+        for name in os.listdir(newdir):
+            dst = os.path.join(olddir, name)
+            if os.path.isdir(dst) and not os.path.islink(dst):
+                shutil.rmtree(dst, ignore_errors=True)
+            os.replace(os.path.join(newdir, name), dst)
+        profs = load_profiles()
+        for q in profs:
+            if q["dir"] == old["dir"]:
+                q.update({k: v for k, v in new.items() if k != "dir" and not k.startswith("_")})
+                old = q
+        save_profiles(profs)
+        return old
+    finally:
+        shutil.rmtree(newdir, ignore_errors=True)
+
+
 def add_profile(p):
     """Сохраняет новый профиль. Тот же аккаунт уже добавлен — RuntimeError, новая папка удаляется."""
     profs = load_profiles()

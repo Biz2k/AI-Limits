@@ -15,7 +15,7 @@ import codex_switch as CX
 import history as H
 import limits as L
 from i18n import T
-from ui_theme import BLUE, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED
+from ui_theme import BLUE, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED, Tooltip
 
 ACCENT = {"claude": CLAUDE, "chatgpt": CODEX, "google": GOOGLE}
 GROUP = {"claude": "Claude", "chatgpt": "ChatGPT", "google": "Google"}
@@ -202,15 +202,29 @@ class AccountsMixin:
         self.root.after(hold * 1000 + 200, self.set_status_updated)
 
     # ------------------------------------------------ добавление
-    def add_account(self, kind="google"):
+    def relogin(self, kind, ident, email, prof=None):
+        """Кнопка ↻ в «Управлении аккаунтами» (1.5.4): войти в добавленный аккаунт заново — свежие токены."""
+        self.close_menu()
+        self.add_account(kind, relogin={"ident": ident, "email": email, "prof": prof})
+
+    def add_account(self, kind="google", relogin=None):
         """Добавить аккаунт: Google — вход в браузере; Claude и ChatGPT — вход самой программы в окне консоли
-        в отдельную папку профиля. Совпал с аккаунтом программы — плитка программы получает его имя."""
+        в отдельную папку профиля. Совпал с аккаунтом программы — плитка программы получает его имя.
+        relogin — повторный вход в уже добавленный аккаунт (↻): вход заменяется, только если это тот же аккаунт."""
         if getattr(self, "adding", False):
             self.cancel_add()  # предыдущий незавершённый вход — отменить, начать новый
         self._add_token = token = getattr(self, "_add_token", 0) + 1
         p = None
         if kind == "google":
-            self.say(T("Войдите в Google в открывшемся браузере…"), GOOGLE)
+            self.say(T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]) if relogin
+                     else T("Войдите в Google в открывшемся браузере…"), GOOGLE)
+        elif relogin:
+            try:
+                p = A.start_login(kind)
+            except Exception as e:
+                self.notify(str(e), RED, hold=20)
+                return
+            self.say(T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]), ACCENT[kind])
         else:
             try:
                 p = A.start_login(kind)
@@ -225,9 +239,15 @@ class AccountsMixin:
         def work():
             try:
                 if kind == "google":
-                    acc = L.ag_login()
-                    L.save_accounts([x for x in L.load_accounts() if x["email"] != acc["email"]] + [acc])
+                    acc = L.ag_login(login_hint=relogin["email"]) if relogin else L.ag_login()
+                    if relogin and acc["email"].lower() != relogin["email"].lower():
+                        raise RuntimeError(T("в браузере выбран {got}, а не {email} — вход не обновлён",
+                                             got=acc["email"], email=relogin["email"]))
+                    L.save_accounts([x for x in L.load_accounts() if x["email"].lower() != acc["email"].lower()]
+                                    + [acc])
                     email = acc["email"]
+                elif relogin:
+                    email = A.relogin_profile(relogin["prof"], A.finish_login(p))["email"]
                 else:
                     email = A.add_profile(A.finish_login(p))["email"]
                 ident = A.ident(kind, email)
@@ -238,6 +258,10 @@ class AccountsMixin:
                     self.adding = False
                     self._show_cancel(False)
                     names = self.names()
+                    if relogin:
+                        self.notify(T("Вход «{name}» обновлён", name=names.get(ident) or email), GREEN)
+                        self.refresh()
+                        return
                     if ident not in names:
                         names[ident] = A.suggest_name(kind, email, self.taken_names(ident))
                         self.persist()
@@ -387,10 +411,10 @@ class AccountsMixin:
                 tk.Label(box, text=T("нет аккаунтов"), bg=CARD, fg=FAINT, font=(FONT, 9),
                          anchor="w").pack(fill="x", padx=(38, 4))
             for ident, name, email, stored, prof in rows:
-                self._account_row(box, kind, ident, name, email, stored, redraw)
+                self._account_row(box, kind, ident, name, email, stored, redraw, prof)
         tk.Frame(box, bg=CARD, height=4).pack()
 
-    def _account_row(self, box, kind, ident, name, email, stored, redraw=None):
+    def _account_row(self, box, kind, ident, name, email, stored, redraw=None, prof=None):
         row = tk.Frame(box, bg=CARD)
         row.pack(fill="x", padx=(36, 2), pady=1)
         text = tk.Frame(row, bg=CARD)
@@ -410,6 +434,9 @@ class AccountsMixin:
         if stored:
             button("✕", lambda b: self.remove_account(ident, b))
         button("✎", lambda b: self._rename_entry(title, ident, name or "", on_done=redraw or self.show_accounts))
+        if stored and (kind == "google" or prof):  # ↻ — войти заново, обновить токены (1.5.4)
+            Tooltip(button("↻", lambda b: self.relogin(kind, ident, email, prof)),
+                    T("Войти в аккаунт заново — обновить вход"))
 
     # ------------------------------------------------ переименование
     def _rename_entry(self, label, ident, current, on_done=None, font=None):

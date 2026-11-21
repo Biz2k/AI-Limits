@@ -483,8 +483,9 @@ def ag_fetch(acc, all_models=False, local=None):
     return res
 
 
-def ag_login():
-    """OAuth-вход через браузер с приёмом кода на 127.0.0.1."""
+def ag_login(login_hint=None):
+    """OAuth-вход через браузер с приёмом кода на 127.0.0.1. login_hint — email, который Google предложит
+    сразу (повторный вход в добавленный аккаунт, 1.5.4)."""
     _need_google_keys()
     state = secrets.token_urlsafe(16)
     result = {}
@@ -509,10 +510,12 @@ def ag_login():
 
     srv = http.server.HTTPServer(("127.0.0.1", 0), H)
     redirect = f"http://127.0.0.1:{srv.server_port}/callback"
-    url = G_AUTH_URL + "?" + urllib.parse.urlencode({
-        "client_id": G_CLIENT_ID, "redirect_uri": redirect, "response_type": "code",
-        "scope": G_SCOPES, "access_type": "offline", "prompt": "consent select_account",
-        "state": state})
+    params = {"client_id": G_CLIENT_ID, "redirect_uri": redirect, "response_type": "code",
+              "scope": G_SCOPES, "access_type": "offline", "prompt": "consent select_account",
+              "state": state}
+    if login_hint:
+        params["login_hint"] = login_hint
+    url = G_AUTH_URL + "?" + urllib.parse.urlencode(params)
     print("Открываю браузер для входа в Google. Если не открылся — откройте ссылку вручную:\n")
     print(url + "\n")
     webbrowser.open(url)

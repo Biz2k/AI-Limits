@@ -688,6 +688,50 @@ def main():
     app.add_account("claude")
     yield wait(10, lambda: not app.adding, "повтор не завершился")
     assert "уже добавлен" in app.status.cget("text") and len(accounts.load_profiles()) == 2
+
+    # ↻ «войти заново» в «Управлении аккаунтами»: тот же аккаунт — вход заменён; другой — не тронут
+    app.show_accounts()
+    yield wait()
+    assert texts(app.menu_win).count("↻") == 4, texts(app.menu_win)    # a, b, cx, second — у «из программы» нет
+    app.close_menu()
+    prof2 = next(q for q in accounts.load_profiles() if q["email"] == "second@example.com")
+    with open(os.path.join(accounts.profiles_dir(), prof2["dir"], "creds.dat"), "w") as f:
+        f.write("old")
+
+    def finish_fresh(p, **k):
+        p = real_finish(p)
+        with open(os.path.join(accounts.profiles_dir(), p["dir"], "creds.dat"), "w") as f:
+            f.write("fresh")
+        return p
+    accounts.finish_login = finish_fresh
+    app.relogin("claude", "claude:second@example.com", "second@example.com", prof2)
+    yield wait(10, lambda: not app.adding, "повторный вход Claude не завершился")
+    assert app.status.cget("text") == "Вход «second» обновлён", app.status.cget("text")
+    with open(os.path.join(accounts.profiles_dir(), prof2["dir"], "creds.dat")) as f:
+        assert f.read() == "fresh"
+    assert len(accounts.load_profiles()) == 2 and not os.path.exists(
+        os.path.join(accounts.profiles_dir(), "claude-%d" % len(started)))  # временная папка входа убрана
+    prof_cx = next(q for q in accounts.load_profiles() if q["kind"] == "chatgpt")
+    accounts.finish_login = lambda p, **k: dict(real_finish(p), email="zz@example.com")
+    app.relogin("chatgpt", "codex:cx@example.com", "cx@example.com", prof_cx)
+    yield wait(10, lambda: not app.adding, "повторный вход ChatGPT не завершился")
+    assert "не обновлён" in app.status.cget("text") and "zz@example.com" in app.status.cget("text")
+    assert [q["email"] for q in accounts.load_profiles() if q["kind"] == "chatgpt"] == ["cx@example.com"]
+    accounts.finish_login = real_finish
+    saved, hints = [], []
+    real_save, L.save_accounts = L.save_accounts, saved.append
+    L.ag_login = lambda login_hint=None: hints.append(login_hint) or {"email": "x@example.com", "refresh_token": "t"}
+    app.relogin("google", "a@example.com", "a@example.com")
+    yield wait(10, lambda: not app.adding, "повторный вход Google не завершился")
+    assert hints == ["a@example.com"] and not saved and "не обновлён" in app.status.cget("text")
+    L.ag_login = lambda login_hint=None: {"email": "A@example.com", "refresh_token": "t2"}
+    app.relogin("google", "a@example.com", "a@example.com")
+    yield wait(10, lambda: not app.adding, "повторный вход Google не завершился")
+    assert saved and [x["email"] for x in saved[-1]] == ["b@example.com", "A@example.com"], saved
+    assert app.status.cget("text") == "Вход «a» обновлён", app.status.cget("text")
+    L.save_accounts = real_save
+    app.status_sticky = 0
+    step("↻ в «Управлении аккаунтами»: повторный вход заменяет вход того же аккаунта; другой аккаунт — отказ")
     assert accounts.suggest_name("chatgpt", "b@example.com", list(app.names().values())) == "Codex b"
     step("«Добавить аккаунт»: совпавший с программой — имя у плитки программы; другой — своя плитка;"
          " повтор не добавляется; занятое имя — с приставкой сервиса")
