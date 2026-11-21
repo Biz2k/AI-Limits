@@ -288,13 +288,17 @@ TEXTS = {
     "в браузере выбран {got}, а не {email} — вход не обновлён":
         ("{got} was chosen in the browser, not {email} — the sign-in was not updated",
          "у браузері вибрано {got}, а не {email} — вхід не оновлено"),
-    "Вход {email} получен, но Google просит подтвердить аккаунт.":
-        ("Signed in to {email}, but Google asks to verify the account.",
-         "Вхід {email} отримано, але Google просить підтвердити акаунт."),
-    "Лимиты Gemini недоступны, пока аккаунт не подтверждён.":
-        ("Gemini limits are unavailable until the account is verified.",
-         "Ліміти Gemini недоступні, доки акаунт не підтверджено."),
-    "Подтвердить аккаунт в Google": ("Verify the account at Google", "Підтвердити акаунт у Google"),
+    "Google просит подтвердить аккаунт": ("Google asks to verify the account", "Google просить підтвердити акаунт"),
+    "Вход в {email} выполнен, но лимиты Gemini недоступны, пока аккаунт не подтверждён в Google.":
+        ("Signed in to {email}, but Gemini limits are unavailable until the account is verified at Google.",
+         "Вхід у {email} виконано, але ліміти Gemini недоступні, доки акаунт не підтверджено в Google."),
+    "Подтвердить аккаунт": ("Verify the account", "Підтвердити акаунт"),
+    "Зачем это нужно —": ("Why this is needed —", "Навіщо це потрібно —"),
+    "справка Google": ("Google Help", "довідка Google"),
+    "Готово": ("Done", "Готово"),
+    "Вход в {email} выполнен. Эту вкладку можно закрыть.":
+        ("Signed in to {email}. You can close this tab.", "Вхід у {email} виконано. Цю вкладку можна закрити."),
+    "Вход не выполнен": ("Sign-in failed", "Вхід не виконано"),
     "неверный ответ Google": ("invalid response from Google", "неправильна відповідь Google"),
     "Вход {email} получен, но Google просит подтвердить аккаунт — ссылка на странице в браузере":
         ("Signed in to {email}, but Google asks to verify the account — the link is on the page in the browser",
