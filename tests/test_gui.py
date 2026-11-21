@@ -546,6 +546,28 @@ def main():
         assert need in t, (need, t)
     assert "←" not in t
     assert t.index("Управление аккаунтами") < t.index("Работа") < t.index("a@example.com") < t.index("Поверх всех окон")
+    # ✎ дважды подряд (поле ещё открыто, например после «имя занято») — без ошибки, то же поле
+    errors = []
+    app.root.report_callback_exception = lambda *a: errors.append(a[1])
+    def walk(w):
+        yield w
+        for c in w.winfo_children():
+            yield from walk(c)
+    pen = next(w for w in walk(app.menu_win) if isinstance(w, tk.Label) and w.cget("text") == "✎")
+    pen.event_generate("<Button-1>")
+    yield wait()
+    first = app.rename_entry
+    first.delete(0, "end")
+    first.insert(0, "a")                                                  # занято — поле остаётся
+    first.event_generate("<Return>")
+    yield wait()
+    pen.event_generate("<Button-1>")
+    yield wait()
+    assert not errors, errors
+    assert app.rename_entry is first and first.winfo_exists()
+    first.event_generate("<Escape>")
+    yield wait()
+    assert not first.winfo_exists() and "Работа" in texts(app.menu_win), texts(app.menu_win)
     menu_item("Управление аккаунтами").winfo_children()[-1].event_generate("<Button-1>")  # повторный щелчок — свернуть
     yield wait()
     assert "Работа" not in texts(app.menu_win) and "Добавить аккаунт" in texts(app.menu_win)
