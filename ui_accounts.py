@@ -15,7 +15,8 @@ import codex_switch as CX
 import history as H
 import limits as L
 from i18n import T
-from ui_theme import BLUE, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED, Tooltip
+from ui_theme import (
+    BLUE, CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, GOOGLE, GREEN, LINE, MUTED, RED, YELLOW, Tooltip)
 
 ACCENT = {"claude": CLAUDE, "chatgpt": CODEX, "google": GOOGLE}
 GROUP = {"claude": "Claude", "chatgpt": "ChatGPT", "google": "Google"}
@@ -235,9 +236,12 @@ class AccountsMixin:
         self._show_cancel(True)
 
         def work():
+            verify = None
             try:
                 if kind == "google":
-                    acc = L.ag_login(login_hint=relogin["email"]) if relogin else L.ag_login()
+                    acc = (L.ag_login(login_hint=relogin["email"], expect=relogin["email"]) if relogin
+                           else L.ag_login())
+                    verify = acc.pop("verify_url", None)  # вход получен, но Google просит подтвердить аккаунт
                     if relogin and acc["email"].lower() != relogin["email"].lower():
                         raise RuntimeError(T("в браузере выбран {got}, а не {email} — вход не обновлён",
                                              got=acc["email"], email=relogin["email"]))
@@ -256,6 +260,11 @@ class AccountsMixin:
                     self.adding = False
                     self._show_cancel(False)
                     names = self.names()
+                    if kind == "google" and verify:
+                        self.notify(T("Вход {email} получен, но Google просит подтвердить аккаунт — "
+                                      "ссылка на странице в браузере", email=email), YELLOW, hold=20)
+                        self.refresh()
+                        return
                     if relogin:
                         self.notify(T("Вход «{name}» обновлён", name=names.get(ident) or email), GREEN)
                         self.refresh()

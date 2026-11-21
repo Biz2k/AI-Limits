@@ -721,11 +721,11 @@ def main():
     accounts.finish_login = real_finish
     saved, hints = [], []
     real_save, L.save_accounts = L.save_accounts, saved.append
-    L.ag_login = lambda login_hint=None: hints.append(login_hint) or {"email": "x@example.com", "refresh_token": "t"}
+    L.ag_login = lambda login_hint=None, expect=None: hints.append(login_hint) or {"email": "x@example.com", "refresh_token": "t"}
     app.relogin("google", "a@example.com", "a@example.com")
     yield wait(10, lambda: not app.adding, "повторный вход Google не завершился")
     assert hints == ["a@example.com"] and not saved and "не обновлён" in app.status.cget("text")
-    L.ag_login = lambda login_hint=None: {"email": "A@example.com", "refresh_token": "t2"}
+    L.ag_login = lambda login_hint=None, expect=None: {"email": "A@example.com", "refresh_token": "t2"}
     app.relogin("google", "a@example.com", "a@example.com")
     yield wait(10, lambda: not app.adding, "повторный вход Google не завершился")
     assert saved and [x["email"] for x in saved[-1]] == ["b@example.com", "A@example.com"], saved

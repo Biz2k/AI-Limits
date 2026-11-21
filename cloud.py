@@ -1,5 +1,6 @@
 """Запросы к Anthropic и Google: OAuth-ключи, аккаунты, лимиты Claude Code и Antigravity из облака."""
 import datetime as dt
+import html
 import http.server
 import json
 import os
@@ -115,8 +116,10 @@ def http_json(url, data=None, headers=None, form=False, method=None):
             raw = r.read()
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
-        txt = e.read().decode(errors="replace")[:300]
-        raise RuntimeError(f"HTTP {e.code}: {txt}") from None
+        full = e.read().decode(errors="replace")
+        err = RuntimeError(f"HTTP {e.code}: {full[:300]}")
+        err.body = full  # полный ответ — для разбора (ссылка подтверждения аккаунта Google)
+        raise err from None
     except urllib.error.URLError as e:
         raise RuntimeError(T("сеть: {reason}", reason=e.reason)) from None
 
@@ -483,24 +486,86 @@ def ag_fetch(acc, all_models=False, local=None):
     return res
 
 
-def ag_login(login_hint=None):
+def validation_url(e):
+    """Ссылка «Verify your account» из отказа облака 403 VALIDATION_REQUIRED (или None)."""
+    try:
+        for d in json.loads(getattr(e, "body", "") or "{}").get("error", {}).get("details", []):
+            url = (d.get("metadata") or {}).get("validation_url")
+            if url and url.startswith("https://accounts.google.com/"):
+                return url
+    except (ValueError, AttributeError):
+        pass
+    return None
+
+
+def _login_page(title, text="", link=None):
+    """Страница в браузере после входа Google."""
+    body = f"<h2>{html.escape(title)}</h2>"
+    if text:
+        body += f"<p>{html.escape(text)}</p>"
+    if link:
+        body += f"<p><a href='{html.escape(link[1], quote=True)}'>{html.escape(link[0])}</a></p>"
+    return ("<!doctype html><meta charset='utf-8'><body style='font-family:sans-serif;max-width:640px;"
+            f"margin:40px auto'>{body}</body>").encode("utf-8")
+
+
+def ag_login(login_hint=None, expect=None):
     """OAuth-вход через браузер с приёмом кода на 127.0.0.1. login_hint — email, который Google предложит
-    сразу (повторный вход в добавленный аккаунт, 1.5.4)."""
+    сразу (повторный вход в добавленный аккаунт, 1.5.4). С 1.5.4 страница «Готово» показывается только после
+    обмена кода на токен, получения email (expect — нужный email: другой — отказ) и проверки облака: если Google
+    требует подтвердить аккаунт (403 VALIDATION_REQUIRED), страница говорит это и даёт его ссылку; аккаунт
+    сохраняется (вход получен), в ответе — verify_url."""
     _need_google_keys()
     state = secrets.token_urlsafe(16)
     result = {}
+
+    def finish(code, redirect):
+        tok = http_json(G_TOKEN_URL, {"code": code, "client_id": G_CLIENT_ID,
+                                      "client_secret": G_CLIENT_SECRET, "redirect_uri": redirect,
+                                      "grant_type": "authorization_code"}, form=True)
+        if not tok.get("refresh_token"):
+            raise RuntimeError(T("Google не выдал refresh_token — попробуйте ещё раз"))
+        info = http_json("https://www.googleapis.com/oauth2/v2/userinfo",
+                         headers={"Authorization": "Bearer " + tok["access_token"]})
+        email = info.get("email") or ""
+        if not email:
+            raise RuntimeError(T("Не удалось узнать email вошедшего аккаунта"))
+        if expect and email.lower() != expect.lower():
+            raise RuntimeError(T("в браузере выбран {got}, а не {email} — вход не обновлён", got=email, email=expect))
+        acc = {"email": email, "refresh_token": tok["refresh_token"], "project": None}
+        try:
+            lca = cc_post("/v1internal:loadCodeAssist", tok["access_token"], {"metadata": CC_META}, email.lower())
+            acc["project"] = extract_project(lca)
+            body = {"project": acc["project"]} if acc["project"] else {}
+            http_json(CC_BASE + "/v1internal:retrieveUserQuotaSummary", body,
+                      headers={"Authorization": "Bearer " + tok["access_token"], "User-Agent": cc_user_agents()[0]})
+        except Exception as e:  # облако недоступно — вход всё равно получен; требует подтверждения — скажем
+            acc["verify_url"] = validation_url(e)
+        return acc
 
     class H(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             if "code" in qs or "error" in qs:
-                result.update({k: v[0] for k, v in qs.items()})
-                ok = "code" in qs and qs.get("state", [""])[0] == state
-                msg = T("Готово, можно закрыть вкладку.") if ok else T("Ошибка входа, см. консоль.")
+                q = {k: v[0] for k, v in qs.items()}
+                if "code" in q and q.get("state") == state:
+                    try:
+                        result["acc"] = acc = finish(q["code"], redirect)
+                        page = (_login_page(T("Вход {email} получен, но Google просит подтвердить аккаунт.",
+                                              email=acc["email"]),
+                                            T("Лимиты Gemini недоступны, пока аккаунт не подтверждён."),
+                                            (T("Подтвердить аккаунт в Google"), acc["verify_url"]))
+                                if acc.get("verify_url") else _login_page(T("Готово, можно закрыть вкладку.")))
+                    except Exception as e:
+                        result["fail"] = str(e)
+                        page = _login_page(T("Вход не выполнен: {error}", error=e))
+                else:
+                    result["fail"] = q.get("error") or T("неверный ответ Google")
+                    page = _login_page(T("Вход не выполнен: {error}", error=result["fail"]))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
-                self.wfile.write(f"<h2 style='font-family:sans-serif'>{msg}</h2>".encode())
+                self.wfile.write(page)
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -523,21 +588,6 @@ def ag_login(login_hint=None):
     th.start()
     th.join(timeout=300)
     srv.server_close()
-    if result.get("state") != state or "code" not in result:
-        raise RuntimeError(T("вход не завершён: {reason}", reason=result.get("error") or T("таймаут")))
-
-    tok = http_json(G_TOKEN_URL, {"code": result["code"], "client_id": G_CLIENT_ID,
-                                  "client_secret": G_CLIENT_SECRET, "redirect_uri": redirect,
-                                  "grant_type": "authorization_code"}, form=True)
-    if not tok.get("refresh_token"):
-        raise RuntimeError(T("Google не выдал refresh_token — попробуйте ещё раз"))
-    info = http_json("https://www.googleapis.com/oauth2/v2/userinfo",
-                     headers={"Authorization": "Bearer " + tok["access_token"]})
-    email = info.get("email", "unknown")
-    project = None
-    try:
-        project = extract_project(cc_post("/v1internal:loadCodeAssist", tok["access_token"],
-                                          {"metadata": CC_META}))
-    except Exception:
-        pass
-    return {"email": email, "refresh_token": tok["refresh_token"], "project": project}
+    if "acc" in result:
+        return result["acc"]
+    raise RuntimeError(result.get("fail") or T("вход не завершён: {reason}", reason=T("таймаут")))

@@ -297,9 +297,12 @@ def main():
         return
     if a.cmd == "add":
         acc = cloud.ag_login()
+        verify = acc.pop("verify_url", None)
         accs = [x for x in cloud.load_accounts() if x["email"] != acc["email"]] + [acc]
         cloud.save_accounts(accs)
         print(c("92", f"Добавлен {acc['email']}. Всего аккаунтов: {len(accs)}"))
+        if verify:
+            print(c("93", "Google просит подтвердить аккаунт — ссылка открыта на странице входа в браузере."))
         return
     if a.cmd == "accounts":
         accs = cloud.load_accounts()
