@@ -298,6 +298,9 @@ TEXTS = {
     "Готово": ("Done", "Готово"),
     "Вход в {email} выполнен. Эту вкладку можно закрыть.":
         ("Signed in to {email}. You can close this tab.", "Вхід у {email} виконано. Цю вкладку можна закрити."),
+    "Сервер временно ограничил запросы — повторю через {min} мин":
+        ("The server is temporarily limiting requests — will retry in {min} min",
+         "Сервер тимчасово обмежив запити — повторю через {min} хв"),
     "Вход не выполнен": ("Sign-in failed", "Вхід не виконано"),
     "неверный ответ Google": ("invalid response from Google", "неправильна відповідь Google"),
     "Вход {email} получен, но Google просит подтвердить аккаунт — ссылка на странице в браузере":
