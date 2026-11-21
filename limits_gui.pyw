@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import threading
+import time
 import tkinter as tk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -212,7 +213,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
     # Google-аккаунт и каждый свой профиль грузятся в своих потоках и появляются по мере готовности.
     IDE_SRC = "данные IDE Antigravity"
 
-    def refresh(self):
+    RATE_PAUSE = 300  # сервер ответил 429 и не сказал, сколько ждать — пауза запросов этой части, с
+
+    def refresh(self, ide_only=False):
+        """Обновить всё. ide_only — только IDE Antigravity и Google (повторы после смены аккаунта IDE: Claude и Codex
+        в них не нужны). Часть, которой сервер ответил 429, не запрашивается до конца паузы — её данные остаются."""
         if self.loading:
             return
         self.loading = True
@@ -220,6 +225,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         jobs = self.plan_jobs()
         prev = self.parts or {}
         self.parts = {k: prev.get(k) for k in jobs if k != "local"}  # старые значения остаются видны
+        now, pause = time.time(), getattr(self, "rate_pause", {})
+        for k in list(jobs):
+            if k == "local":
+                continue
+            if pause.get(k, 0) > now or ide_only and not (k[0] == "google" or k == ("ide", "google")):
+                del jobs[k]  # пауза после 429 или повтор только ради IDE — прежнее значение остаётся
         self.pending = set(jobs)
         self.redraw()
 
@@ -240,6 +251,16 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
     def _on_part(self, key, val):
         self.pending.discard(key)
+        if getattr(val, "code", None) == 429:  # сервер временно ограничил запросы (1.5.4)
+            wait = getattr(val, "retry_after", 0) or self.RATE_PAUSE
+            self.rate_pause = getattr(self, "rate_pause", {})
+            self.rate_pause[key] = time.time() + wait
+            old = (self.parts or {}).get(key)
+            if isinstance(old, dict):
+                val = old  # прежние данные остаются, пока сервер снова не начнёт отвечать
+            else:
+                val = RuntimeError(T("Сервер временно ограничил запросы — повторю через {min} мин",
+                                     min=max(1, round(wait / 60))))
         if key == "local":
             val = val if isinstance(val, dict) else {}
             self.ide_local = val
@@ -273,9 +294,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             got = (self.ide_local or {}).get("accounts", {}) if getattr(self, "ide_local", None) else {}
             if want[0] in got or want[1] <= 0:
                 self._ide_expect = None
-            else:  # IDE ещё не отдала лимиты нового аккаунта — спросить снова через 3 с
+            else:  # IDE ещё не отдала лимиты нового аккаунта — спросить снова через 3 с (только IDE и Google)
                 want[1] -= 1
-                self.root.after(3000, self.refresh)
+                self.root.after(3000, lambda: self.refresh(ide_only=True))
         self.set_status_updated()
         self.update_tray_tip(self.data)
         self.check_alerts(self.data)

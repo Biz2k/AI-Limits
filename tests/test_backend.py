@@ -882,6 +882,36 @@ def test_google_login_page():
          "ссылка Google на странице; другой аккаунт или нет токена — ошибка на странице")
 
 
+# ------------------------------------------------------------------ ошибки HTTP: коротко, с кодом и Retry-After
+def test_http_errors():
+    import email.message
+    import io
+    import urllib.error
+    real = cloud.urllib.request.urlopen
+
+    def fail(body, code=429, retry=None):
+        def urlopen(req, timeout=None):
+            h = email.message.Message()
+            if retry:
+                h["Retry-After"] = retry
+            raise urllib.error.HTTPError(req.full_url, code, "x", h, io.BytesIO(body.encode()))
+        return urlopen
+    try:
+        cloud.urllib.request.urlopen = fail(json.dumps({"type": "error", "error": {
+            "type": "rate_limit_error", "message": "Rate limited. Please try again later."}}), retry="120")
+        e = expect_error(RuntimeError, lambda: cloud.http_json("https://example.com/x"))
+        assert e == "HTTP 429: Rate limited. Please try again later.", e
+        try:
+            cloud.http_json("https://example.com/x")
+        except RuntimeError as err:
+            assert err.code == 429 and err.retry_after == 120 and "rate_limit_error" in err.body
+        cloud.urllib.request.urlopen = fail("plain text", code=500)
+        assert expect_error(RuntimeError, lambda: cloud.http_json("https://example.com/x")) == "HTTP 500: plain text"
+    finally:
+        cloud.urllib.request.urlopen = real
+    step("ошибка HTTP: в тексте только сообщение сервера (без JSON), код и Retry-After — в полях ошибки")
+
+
 def main():
     print("Проверка логики (вымышленные данные, папка", TMP + ")")
     test_dpapi()
@@ -895,6 +925,7 @@ def main():
     test_switch()
     test_codex()
     test_google_login_page()
+    test_http_errors()
     test_accounts()
     test_codex_switch()
     test_claude_switch()

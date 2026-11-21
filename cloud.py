@@ -118,8 +118,20 @@ def http_json(url, data=None, headers=None, form=False, method=None):
             return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
         full = e.read().decode(errors="replace")
-        err = RuntimeError(f"HTTP {e.code}: {full[:300]}")
+        msg = full[:300]
+        try:  # {"error": {"message": …}} (Google, Anthropic) — в тексте ошибки только сообщение, без JSON (1.5.4)
+            j = json.loads(full)
+            if isinstance(j.get("error"), dict) and j["error"].get("message"):
+                msg = str(j["error"]["message"])[:300]
+        except (ValueError, AttributeError):
+            pass
+        err = RuntimeError(f"HTTP {e.code}: {msg}")
         err.body = full  # полный ответ — для разбора (ссылка подтверждения аккаунта Google)
+        err.code = e.code
+        try:
+            err.retry_after = int((e.headers or {}).get("Retry-After") or 0)
+        except (TypeError, ValueError):
+            err.retry_after = 0
         raise err from None
     except urllib.error.URLError as e:
         raise RuntimeError(T("сеть: {reason}", reason=e.reason)) from None

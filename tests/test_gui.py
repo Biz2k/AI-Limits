@@ -211,6 +211,34 @@ def main():
     assert "61%" in " ".join(texts(app.cards["a@example.com"].outer))
     step("обновление на месте: карточки и число виджетов прежние, значение новое")
 
+    # сервер ответил 429: прежние данные остаются, запросы этой части — на паузе; данных нет — короткая строка
+    calls, real_cf = [], L.claude_fetch
+
+    def limited(profile=None):
+        calls.append(profile)
+        err = RuntimeError("HTTP 429: Rate limited. Please try again later.")
+        err.code, err.retry_after = 429, 0
+        raise err
+    before = " ".join(texts(app.cards["claude"].outer))
+    L.claude_fetch = limited
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert calls and " ".join(texts(app.cards["claude"].outer)) == before, texts(app.cards["claude"].outer)
+    assert app.rate_pause[("ide", "claude")] > time.time() + 200
+    n = len(calls)
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert len(calls) == n                                               # пауза: сервер не спрашиваем
+    app.parts[("ide", "claude")], app.rate_pause = None, {}
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    t429 = " ".join(texts(app.cards["claude"].outer))
+    assert "временно ограничил запросы" in t429 and "{" not in t429, t429
+    L.claude_fetch, app.rate_pause = real_cf, {}
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "%" in " ".join(texts(app.cards["claude"].outer)), "Claude не вернулся")
+    step("сервер ответил 429: прежние данные остаются, пауза запросов; без данных — короткая строка вместо JSON")
+
     real_ag = L.ag_fetch
     L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), plan="Antigravity Starter Quota")
     app.refresh()
