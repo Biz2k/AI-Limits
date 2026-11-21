@@ -229,6 +229,7 @@ def main():
     cbv = app.cards["b@example.com"]
     assert cbv.badge.cget("text") == "LOGOUT" and cbv.badge.cget("fg") == G.RED, cbv.badge.cget("text")
     assert "Verify your account" in cbv.badge_tip.text
+    assert cbv.ide_mode is None and not cbv.ide.winfo_ismapped()       # ни «→ в IDE», ни метки IDE
     assert all(r.bar.color == G.FAINT and r.pct.cget("fg") == G.FAINT for r in cbv.rows if r.bar.used), \
         [(r.bar.color, r.pct.cget("fg")) for r in cbv.rows]
     ca = app.cards["a@example.com"]
@@ -313,29 +314,29 @@ def main():
     step("смена аккаунта: отмена, подтверждение, повтор опроса до появления данных IDE; плитки остаются на"
          " местах, метка «● IDE» переходит на новый аккаунт; на время сообщения «макс.» скрыто")
 
-    # окно IDE открыто, а входа нет (сервера IDE нет): запись входа (b@) — не аккаунт IDE
+    # окно IDE открыто, а входа нет (сервера IDE нет): отдельной плитки нет, у аккаунта записи входа — серое «○ IDE»
     L.local_ide_info = lambda: {"running": False, "window": True, "email": None, "accounts": {}}
     app.refresh()
-    yield wait(10, lambda: not app.loading and "antigravity" in app.cards, "нет плитки «IDE без входа»")
-    assert not app.tile_info["b@example.com"]["ide"] and app.cards["b@example.com"].ide_mode == "switch"
-    assert "вход не выполнен" in " ".join(texts(app.cards["antigravity"].outer))
-    assert app.cards["antigravity"].ide_mode is None
+    cb = app.cards["b@example.com"]
+    yield wait(10, lambda: not app.loading and cb.ide_mode == "current_nologin", "нет «○ IDE» у IDE без входа")
+    assert "antigravity" not in app.cards and cb.ide.cget("text") == "○ IDE" and cb.ide.cget("fg") == G.FAINT
+    assert not cb.ide_tip.text and app.cards["a@example.com"].ide_mode == "switch"
+    STATE["ide_account"] = None                                          # и записи входа нет — ни плитки, ни метки
+    app.refresh()
+    yield wait(10, lambda: not app.loading and cb.ide_mode == "switch", "метка IDE осталась без записи входа")
+    assert "antigravity" not in app.cards
+    STATE["ide_account"] = "b@example.com"
     # IDE закрыта: серое «○ IDE» с подсказкой; после неподтверждённой смены — и об этом
     L.local_ide_info = lambda: {"running": False, "window": False, "email": None, "accounts": {}}
     app.refresh()
-    yield wait(10, lambda: not app.loading and "antigravity" not in app.cards, "плитка «IDE без входа» осталась")
-    cb = app.cards["b@example.com"]
+    yield wait(10, lambda: not app.loading and cb.ide_mode == "current_idle", "нет «○ IDE» у закрытой IDE")
     assert cb.ide_mode == "current_idle" and cb.ide.cget("text") == "○ IDE" and cb.ide.cget("fg") == G.FAINT
-    assert "закрыта" in cb.ide_tip.text and "не подтвердилась" not in cb.ide_tip.text
-    app.ide_unverified = "b@example.com"
-    app.redraw()
-    yield wait()
-    assert cb.ide_mode == "current_unverified" and "не подтвердилась" in cb.ide_tip.text, cb.ide_tip.text
+    assert not cb.ide_tip.text                                         # без подсказки (владелец)
     L.local_ide_info = fake_ide_info
     app.refresh()
     yield wait(10, lambda: not app.loading and app.cards["b@example.com"].ide_mode == "current", "IDE не вернулась")
-    assert app.ide_unverified is None and app.cards["b@example.com"].ide.cget("text") == "● IDE"
-    step("IDE открыта без входа — плитка «вход не выполнен», метки нет; закрыта — серое «○ IDE» с подсказкой")
+    assert app.cards["b@example.com"].ide.cget("text") == "● IDE"
+    step("IDE открыта без входа или закрыта — серое «○ IDE» без подсказки у аккаунта записи входа, без лишней плитки")
 
     app.alerted = set()
     fake = [("claude", {"kind": "claude", "ident": "claude:me@example.com", "title": "Claude Code", "ide": True,

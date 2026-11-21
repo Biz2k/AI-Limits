@@ -291,12 +291,6 @@ TEXTS = {
     "Вход «{name}» обновлён": ("Sign-in of “{name}” updated", "Вхід «{name}» оновлено"),
     "Войти в аккаунт заново — обновить вход":
         ("Sign in to the account again — refresh the sign-in", "Увійти в акаунт заново — оновити вхід"),
-    "IDE Antigravity закрыта. При запуске она войдёт этим аккаунтом.":
-        ("The Antigravity IDE is closed. It will sign in with this account when started.",
-         "IDE Antigravity закрита. Під час запуску вона увійде цим акаунтом."),
-    "Последняя смена аккаунта не подтвердилась — проверьте вход в самой IDE.":
-        ("The last account switch was not confirmed — check the sign-in in the IDE itself.",
-         "Остання зміна акаунта не підтвердилася — перевірте вхід у самій IDE."),
     "Сохранённое значение от {seen}.\nСейчас облако отдаёт другой лимит.":
         ("Saved value from {seen}.\nThe cloud currently reports a different limit.",
          "Збережене значення від {seen}.\nЗараз хмара віддає інший ліміт."),
