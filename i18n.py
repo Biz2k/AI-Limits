@@ -274,6 +274,15 @@ TEXTS = {
          "or if you sign in to the Antigravity IDE with this account.",
          "Хмара зараз віддає лише інший ліміт.\nЗначення з'явиться, коли він скинеться,\n"
          "або якщо увійти цим акаунтом в IDE Antigravity."),
+    "Google просит подтвердить этот аккаунт (Verify your account).\n"
+    "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
+    "и не подтвердите аккаунт.":
+        ("Google asks to verify this account (Verify your account).\n"
+         "Gemini limits are unavailable until you sign in with it in the Antigravity IDE\n"
+         "and verify the account.",
+         "Google просить підтвердити цей акаунт (Verify your account).\n"
+         "Ліміти Gemini недоступні, доки ви не увійдете ним в IDE Antigravity\n"
+         "і не підтвердите акаунт."),
     "Сохранённое значение от {seen}.\nСейчас облако отдаёт другой лимит.":
         ("Saved value from {seen}.\nThe cloud currently reports a different limit.",
          "Збережене значення від {seen}.\nЗараз хмара віддає інший ліміт."),

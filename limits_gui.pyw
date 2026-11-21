@@ -376,7 +376,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
         def spec(**kw):
             return dict(dict(collapsible=False, folded=False, badge="", summary=None, ide=None,
-                             msg=None, rows=[], title=None), **kw)
+                             msg=None, rows=[], title=None, badge_fg=None, badge_tip="", dim=False), **kw)
 
         loading = (T("Загрузка…"), MUTED, (FONT, 10, "italic"), (10, 2))
 
@@ -409,9 +409,17 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 low = plan.lower()  # бесплатный тариф Google называет «Antigravity Starter Quota» — значок FREE
                 plan = ("ULTRA" if "ultra" in low else "PRO" if "pro" in low else
                         "FREE" if "starter" in low or "free" in low else plan)
+            off = bool(res.get("verify"))  # Google просит подтвердить аккаунт: значок LOGOUT красным, полосы бледные
+            summary = self.weekly_left(rows) if folded else None
+            if off and summary:
+                summary = (summary[0], FAINT)
             specs.append((key, title, accent, spec(
-                collapsible=True, folded=folded, badge=plan, ide=mode,
-                summary=self.weekly_left(rows) if folded else None,
+                collapsible=True, folded=folded, badge="LOGOUT" if off else plan, ide=mode,
+                badge_fg=RED if off else None, dim=off,
+                badge_tip=T("Google просит подтвердить этот аккаунт (Verify your account).\n"
+                            "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
+                            "и не подтвердите аккаунт.") if off else "",
+                summary=summary,
                 msg=None if rows or folded else (T("Нет данных о лимитах Gemini") if t["kind"] == "google"
                                                  else T("Нет данных о лимитах"), MUTED, (FONT, 10), (8, 0)),
                 rows=[] if folded else [(r["name"], r["used"], r["resets_at"], r.get("seen")) for r in rows])))
@@ -439,7 +447,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             self.cards[k].update(s, self.warn)
 
         every = [(t["title"], t["res"]) for _, t in tiles]
-        best = L.best_weekly(every)  # наибольший остаток недельного лимита среди всех аккаунтов всех сервисов (1.5.1)
+        best = L.best_weekly([(n, r) for n, r in every if not (isinstance(r, dict) and r.get("verify"))])  # наибольший остаток недельного лимита среди всех аккаунтов всех сервисов (1.5.1)
         footer_on = bool(best and len(every) > 1)
         if footer_on:
             kind = next(t["kind"] for _, t in tiles if t["title"] == best[0])
