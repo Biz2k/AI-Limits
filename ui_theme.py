@@ -140,6 +140,80 @@ class Bar(tk.Canvas):
             rounded(self, 0, 0, fw, self.H, self.H / 2, fill=self.color, outline="")
 
 
+class ThinScrollbar(tk.Canvas):
+    """Тонкая вертикальная полоса прокрутки в стиле окна (1.5.6, владелец): скруглённый ползунок цвета линий,
+    светлее при наведении и пока тянут. Видна, только когда содержимое не помещается; лежит поверх правого поля
+    окна (place), поэтому карточки не сдвигаются. Ползунок тянется мышью, щелчок по дорожке — на страницу."""
+    W = 6
+    THUMB, THUMB_HI = "#3a4150", "#566074"
+    MIN_THUMB = 24
+
+    def __init__(self, master, target, x=-7):
+        super().__init__(master, width=self.W, bg=BG, highlightthickness=0, cursor="arrow")
+        self.target, self.x = target, x
+        self.first, self.last = 0.0, 1.0
+        self.hover = self.drag = False
+        self.shown = False
+        self.bind("<Configure>", lambda e: self.draw())
+        self.bind("<Enter>", lambda e: self._hover(True))
+        self.bind("<Leave>", lambda e: self._hover(False))
+        self.bind("<ButtonPress-1>", self._press)
+        self.bind("<B1-Motion>", self._motion)
+        self.bind("<ButtonRelease-1>", self._release)
+
+    def set(self, first, last):
+        """yscrollcommand прокручиваемого Canvas."""
+        self.first, self.last = float(first), float(last)
+        need = self.last - self.first < 0.999
+        if need != self.shown:
+            self.shown = need
+            if need:
+                self.place(relx=1.0, x=self.x, y=2, relheight=1.0, height=-4, anchor="ne")
+                tk.Misc.tkraise(self)  # у Canvas lift — это порядок фигур, а не окна
+            else:
+                self.place_forget()
+        if need:
+            self.draw()
+
+    def _thumb(self):
+        h = self.winfo_height()
+        size = max(self.MIN_THUMB, (self.last - self.first) * h)
+        top = self.first / max(1e-6, 1 - (self.last - self.first)) * (h - size) if self.last < 1 else h - size
+        return max(0.0, top), size, h
+
+    def draw(self):
+        self.delete("all")
+        if not self.shown or self.winfo_height() < 8:
+            return
+        top, size, _ = self._thumb()
+        rounded(self, 0, top, self.W, top + size, self.W / 2, outline="",
+                fill=self.THUMB_HI if self.hover or self.drag else self.THUMB)
+
+    def _hover(self, on):
+        self.hover = on
+        self.draw()
+
+    def _press(self, e):
+        top, size, h = self._thumb()
+        if top <= e.y <= top + size:  # за ползунок — тянуть
+            self.drag, self._grab = True, e.y - top
+            self.draw()
+        else:  # по дорожке — на страницу в сторону щелчка
+            self.target.yview_scroll(-1 if e.y < top else 1, "pages")
+
+    def _motion(self, e):
+        if not self.drag:
+            return
+        top, size, h = self._thumb()
+        room = max(1.0, h - size)
+        frac = min(1.0, max(0.0, (e.y - self._grab) / room))
+        self.target.yview_moveto(frac * (1 - (self.last - self.first)))
+
+    def _release(self, _e):
+        self.drag = False
+        self.draw()
+
+
 class FlatButton(tk.Label):
     def __init__(self, master, text, cmd, bg=CARD_HI, fg=FG, hover="#2a2f3a", **kw):
         super().__init__(master, text=text, bg=bg, fg=fg, cursor="hand2",

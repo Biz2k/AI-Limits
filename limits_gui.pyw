@@ -18,7 +18,7 @@ import limits as L  # noqa: E402
 import i18n  # noqa: E402
 from i18n import T  # noqa: E402
 from ui_theme import (
-    BG, BLUE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, Tooltip, YELLOW,
+    BG, BLUE, FAINT, FG, FONT, FONT_D, FlatButton, GOOGLE, GREEN, MUTED, RED, ThinScrollbar, Tooltip, YELLOW,
     color_for)
 from ui_cards import CardView, _set  # noqa: E402
 from ui_popups import PopupsMixin  # noqa: E402
@@ -110,6 +110,9 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.body = tk.Frame(self.cv, bg=BG)
         self.body_id = self.cv.create_window((0, 0), window=self.body, anchor="nw")
         self.cv.pack(side="left", fill="both", expand=True)
+        # тонкая полоса прокрутки (1.5.6) — поверх правого поля окна, видна, только когда карточки не помещаются
+        self.scrollbar = ThinScrollbar(wrap, self.cv)
+        self.cv.configure(yscrollcommand=self.scrollbar.set)
         self.body.bind("<Configure>", self._on_body)
         self.cv.bind("<Configure>", lambda e: self.cv.itemconfig(self.body_id, width=e.width))
         root.bind_all("<MouseWheel>", self._wheel)

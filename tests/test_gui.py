@@ -279,6 +279,35 @@ def main():
     assert cc.badge.cget("text") != "OFFLINE"
     step("нет связи: значок OFFLINE, прежние данные бледные; без данных — «Нет связи с сервером»")
 
+    # тонкая полоса прокрутки (1.5.6): видна, только когда карточки не помещаются; в правом поле, карточки не сдвигает
+    sb = app.scrollbar
+    app.fit_height()                                                     # окно по содержимому — полосы нет
+    yield wait(0.4)
+    geo = root.geometry()
+    assert not sb.shown and not sb.winfo_ismapped(), (app.cv.yview(), geo)
+    widths = {k: c.outer.winfo_width() for k, c in app.cards.items()}
+    root.geometry(f"{root.winfo_width()}x260")
+    yield wait(0.4)
+    assert sb.shown and sb.winfo_ismapped() and sb.winfo_width() <= 8, (sb.shown, sb.winfo_width())
+    right = max(c.outer.winfo_rootx() + c.outer.winfo_width() for c in app.cards.values())
+    assert sb.winfo_rootx() >= right, (sb.winfo_rootx(), right)                # в поле справа от карточек
+    assert {k: c.outer.winfo_width() for k, c in app.cards.items()} == widths   # карточки не сузились
+    top, size, h = sb._thumb()
+    sb.event_generate("<ButtonPress-1>", x=3, y=int(top + size / 2))         # тянем ползунок вниз
+    sb.event_generate("<B1-Motion>", x=3, y=int(top + size / 2 + 60))
+    sb.event_generate("<ButtonRelease-1>", x=3, y=int(top + size / 2 + 60))
+    yield wait(0.2)
+    assert app.cv.yview()[0] > 0, app.cv.yview()
+    sb.event_generate("<ButtonPress-1>", x=3, y=1)                            # щелчок по дорожке выше — вверх
+    sb.event_generate("<ButtonRelease-1>", x=3, y=1)
+    yield wait(0.2)
+    assert app.cv.yview()[0] == 0, app.cv.yview()
+    root.geometry(geo)
+    app.fit_height()
+    yield wait(0.4)
+    assert not sb.shown and not sb.winfo_ismapped()
+    step("полоса прокрутки: тонкая, только когда карточки не помещаются, в правом поле; тянется и листает")
+
     real_ag = L.ag_fetch
     L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), plan="Antigravity Starter Quota")
     app.refresh()
