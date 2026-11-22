@@ -528,7 +528,7 @@ def main():
         return next(w for w in walk_all(app.menu_win) if isinstance(w, tk.Label) and w.cget("text") == text)
     errors = []
     app.root.report_callback_exception = lambda *a: errors.append(a[1])
-    old = app.warn
+    old, win = app.warn, app.menu_win
     on = __import__("ui_theme").BLUE                                    # выбранный порог — синий
     chip("90%").event_generate("<Button-1>")                            # при загруженных данных (22.11.2026:
     yield wait(0.3)                                                     # render(*data) падал, меню не обновлялось)
@@ -536,6 +536,7 @@ def main():
     chip("80%").event_generate("<Button-1>")
     yield wait(0.3)
     assert app.warn == 80 and chip("80%").cget("bg") == on and chip("90%").cget("bg") != on and not errors, errors
+    assert app.menu_win is win and len(win.winfo_children()) == 1        # то же окно, без мерцания (1.5.6)
     app.warn = old
     app.close_menu()
     assert not SAVED[-1]["two_columns"] and abs(root.winfo_width() - w0) < 4, (w0, root.winfo_width())

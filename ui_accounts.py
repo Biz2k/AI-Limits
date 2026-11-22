@@ -493,7 +493,7 @@ class AccountsMixin:
             if on_done:
                 on_done()
         ent.bind("<Return>", lambda e: close(True))
-        ent.bind("<Escape>", lambda e: close(False))
+        ent.bind("<Escape>", lambda e: (close(False), "break")[1])  # Esc поля не закрывает меню ⚙ вокруг него
         ent.bind("<FocusOut>", lambda e: self.root.after(150, lambda: ent.winfo_exists() and
                                                            self.root.focus_get() is not ent and close(True, True)))
 

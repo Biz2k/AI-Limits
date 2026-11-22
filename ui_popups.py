@@ -131,16 +131,22 @@ class PopupsMixin:
 
     def _show_menu(self, show_remove, fade=False):
         """Своё тёмное меню настроек: отметки и выбор видны на тёмном фоне. fade — плавно проявить (открытие
-        кнопкой ⚙; при перерисовке после щелчка по пункту меню не мигает)."""
-        self.close_menu()
-        p = tk.Toplevel(self.root)
-        if fade:
-            fade_in(p)
-        p.overrideredirect(True)
-        p.attributes("-topmost", True)
-        p.configure(bg=LINE)
-        box = tk.Frame(p, bg=CARD, padx=6, pady=6)
-        box.pack(padx=1, pady=1)
+        кнопкой ⚙; при перерисовке после щелчка по пункту меню не мигает).
+        Меню уже открыто (щелчок по галочке, порогу, языку…) — окно то же, меняется только содержимое: новое
+        собирается целиком и заменяет прежнее за один проход, без пустого кадра (1.5.6, владелец: «мерцание»)."""
+        p = getattr(self, "menu_win", None)
+        if p is not None and not fade and p.winfo_exists():
+            old = p.winfo_children()
+        else:
+            self.close_menu()
+            p = tk.Toplevel(self.root)
+            if fade:
+                fade_in(p)
+            p.overrideredirect(True)
+            p.attributes("-topmost", True)
+            p.configure(bg=LINE)
+            old = []
+        box = tk.Frame(p, bg=CARD, padx=6, pady=6)  # упаковывается после сборки — см. конец
         self.menu_win = p
 
         mark_w = tkfont.Font(font=(FONT, 10, "bold")).measure("00") + 4  # ширина колонки отметок
@@ -250,8 +256,7 @@ class PopupsMixin:
              check=autostart_enabled())
         item(T("Предупреждения по прогнозу"), toggle_forecast_alerts, check=bool(self.s.get("forecast_alerts")))
         item(T("Карточки в две колонки"),  # окно меняет ширину — меню открывается заново под кнопкой ⚙
-             lambda: (self.close_menu(), self.toggle_two_columns(), self.root.update(),
-                      self._show_menu(show_remove)),
+             lambda: (self.toggle_two_columns(), self.root.update(), self._show_menu(show_remove)),
              check=bool(self.s.get("two_columns")))
         chips(T("Автообновление"), [(T(n), s) for n, s in INTERVALS], self.interval, self.set_interval)
         chips(T("Порог предупреждения"), [(f"{v}%", v) for v in (70, 80, 90, 95)] + [(T("выкл"), 0)], int(self.warn),
@@ -262,6 +267,9 @@ class PopupsMixin:
         tk.Label(box, text=f"AI Limits {L.__version__}", bg=CARD, fg=FAINT, font=(FONT, 8), anchor="e",
                  padx=8).pack(fill="x", pady=(2, 0))
 
+        for w in old:
+            w.destroy()
+        box.pack(padx=1, pady=1)
         p.update_idletasks()
         bx = self.menu_btn.winfo_rootx()
         by = self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4
