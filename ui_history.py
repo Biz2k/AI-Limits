@@ -17,7 +17,7 @@ class HistoryMixin:
         """После полного обновления: дописать значения в историю и пересчитать прогнозы (self.fc)."""
         try:
             items = [(t["ident"], t["res"]) for _, t in self.data or [] if isinstance(t["res"], dict)]
-            H.record(None, [], items=items)
+            H.record(None, [], items=[(k, r) for k, r in items if not r.get("offline")])  # прежние — не новые
             self.fc = H.forecasts(None, [], items=items)
         except Exception as e:  # история — вспомогательная: её сбой не должен мешать показу лимитов
             self.fc = {}

@@ -134,7 +134,18 @@ def http_json(url, data=None, headers=None, form=False, method=None):
             err.retry_after = 0
         raise err from None
     except urllib.error.URLError as e:
-        raise RuntimeError(T("сеть: {reason}", reason=e.reason)) from None
+        raise Offline(T("сеть: {reason}", reason=e.reason)) from None
+    except (TimeoutError, ConnectionError) as e:  # оборвалось уже во время чтения ответа
+        raise Offline(T("сеть: {reason}", reason=e)) from None
+
+
+class Offline(RuntimeError):
+    """Нет связи с сервером: сеть недоступна, адрес не находится, сервер не ответил (1.5.6). Окно показывает у
+    плитки значок OFFLINE и прежние данные, если они были."""
+
+
+def is_offline(e):
+    return isinstance(e, Offline)
 
 
 # ================================================================ Claude Code
@@ -229,6 +240,8 @@ def _codex_refresh(profile, data):
     try:
         d = http_json(OPENAI_TOKEN_URL, {"client_id": cid, "grant_type": "refresh_token",
                                          "refresh_token": t.get("refresh_token"), "scope": "openid profile email"})
+    except Offline:
+        raise  # нет связи — вход тут ни при чём
     except RuntimeError as e:
         raise RuntimeError(T("вход профиля устарел — удалите аккаунт и добавьте заново ({error})", error=e)) from None
     for k in ("id_token", "access_token", "refresh_token"):

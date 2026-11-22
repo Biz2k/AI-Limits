@@ -253,6 +253,31 @@ def main():
     yield wait(10, lambda: not app.loading and "%" in " ".join(texts(app.cards["claude"].outer)), "Claude не вернулся")
     step("сервер ответил 429: прежние данные остаются, пауза запросов; без данных — короткая строка вместо JSON")
 
+    # нет связи (1.5.6): прежние данные остаются — бледные, значок OFFLINE; данных нет — OFFLINE и короткий текст
+    def offline(profile=None):
+        raise L.Offline("сеть: [Errno 11001] getaddrinfo failed")
+    cc = app.cards["claude"]
+    L.claude_fetch = offline
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    assert cc.badge.cget("text") == "OFFLINE" and cc.badge.winfo_ismapped() and cc.badge.cget("fg") == G.YELLOW
+    assert "%" in " ".join(texts(cc.outer)) and "getaddrinfo" not in " ".join(texts(cc.outer))
+    assert cc.rows[0].pct.cget("fg") != G.color_for(cc.rows[0].bar.used, app.warn)  # прежние данные — бледные
+    app.show_popup()
+    yield wait()
+    assert "OFFLINE" in texts(app.popup) and "ошибка" not in texts(app.popup), texts(app.popup)
+    app.hide_popup()
+    app.parts[("ide", "claude")] = None
+    app.refresh()
+    yield wait(10, lambda: not app.loading)
+    tx = " ".join(texts(cc.outer))
+    assert cc.badge.cget("text") == "OFFLINE" and "Нет связи с сервером" in tx and "getaddrinfo" not in tx, tx
+    L.claude_fetch = real_cf
+    app.refresh()
+    yield wait(10, lambda: not app.loading and "%" in " ".join(texts(cc.outer)), "Claude не вернулся")
+    assert cc.badge.cget("text") != "OFFLINE"
+    step("нет связи: значок OFFLINE, прежние данные бледные; без данных — «Нет связи с сервером»")
+
     real_ag = L.ag_fetch
     L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), plan="Antigravity Starter Quota")
     app.refresh()

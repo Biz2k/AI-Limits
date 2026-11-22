@@ -934,9 +934,31 @@ def test_http_errors():
             assert err.code == 429 and err.retry_after == 120 and "rate_limit_error" in err.body
         cloud.urllib.request.urlopen = fail("plain text", code=500)
         assert expect_error(RuntimeError, lambda: cloud.http_json("https://example.com/x")) == "HTTP 500: plain text"
+        try:
+            cloud.http_json("https://example.com/x")
+        except RuntimeError as err:
+            assert not cloud.is_offline(err)                                # ответ сервера — не «нет связи»
+        for exc in (urllib.error.URLError("[Errno 11001] getaddrinfo failed"), TimeoutError("timed out"),
+                    ConnectionResetError("reset")):                         # нет связи (1.5.6)
+            def down(req, timeout=None, exc=exc):
+                raise exc
+            cloud.urllib.request.urlopen = down
+            try:
+                cloud.http_json("https://example.com/x")
+                raise AssertionError("нет ошибки")
+            except RuntimeError as err:
+                assert cloud.is_offline(err), (exc, err)
+        real_rj, real_ws = cloud.accounts.jwt_claims, cloud.accounts.write_secret
+        try:  # обновление входа профиля ChatGPT без связи — «нет связи», а не «вход устарел»
+            msg = expect_error(cloud.Offline, lambda: cloud._codex_refresh("p", {"tokens": {
+                "refresh_token": "r", "oauth_provenance": {"client_id": "c"}}}))
+            assert "устарел" not in msg, msg
+        finally:
+            cloud.accounts.jwt_claims, cloud.accounts.write_secret = real_rj, real_ws
     finally:
         cloud.urllib.request.urlopen = real
-    step("ошибка HTTP: в тексте только сообщение сервера (без JSON), код и Retry-After — в полях ошибки")
+    step("ошибка HTTP: в тексте только сообщение сервера (без JSON), код и Retry-After — в полях ошибки; "
+         "нет связи — Offline")
 
 
 # ------------------------------------------------------------------ новая IDE: ключ сервера — из hub_<порт>.json

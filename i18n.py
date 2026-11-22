@@ -382,6 +382,7 @@ TEXTS = {
         ("Antigravity OAuth keys are missing — set them: python limits.py keys, or environment variables (see README)",
          "немає OAuth-ключів Antigravity — задайте їх: python limits.py keys або змінні середовища (див. README)"),
     "сеть: {reason}": ("network: {reason}", "мережа: {reason}"),
+    "Нет связи с сервером": ("No connection to the server", "Немає зв'язку з сервером"),
     "нет ~/.claude/.credentials.json — войдите в Claude Code командой `claude`":
         ("~/.claude/.credentials.json not found — sign in to Claude Code with `claude`",
          "немає ~/.claude/.credentials.json — увійдіть у Claude Code командою `claude`"),

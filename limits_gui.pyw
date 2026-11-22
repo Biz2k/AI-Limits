@@ -261,7 +261,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             else:
                 val = RuntimeError(T("Сервер временно ограничил запросы — повторю через {min} мин",
                                      min=max(1, round(wait / 60))))
-        if key == "local":
+        old = (self.parts or {}).get(key)
+        if key != "local" and L.is_offline(val) and isinstance(old, dict):
+            # нет связи (1.5.6): прежние данные остаются, плитка — со значком OFFLINE, пока сервер снова не ответит
+            self.parts[key] = dict(old, offline=True)
+        elif key == "local":
             val = val if isinstance(val, dict) else {}
             self.ide_local = val
             self.ide_running = bool(val.get("running") or val.get("window") or val.get("hidden"))
@@ -423,7 +427,12 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 specs.append((key, title, accent, spec(msg=loading, ide=mode, quiet=quiet)))
                 continue
             if isinstance(res, Exception):
-                specs.append((key, title, accent, spec(msg=failed(res), ide=mode, quiet=quiet)))
+                if L.is_offline(res):  # нет связи, прежних данных нет (1.5.6) — значок OFFLINE и короткий текст
+                    specs.append((key, title, accent, spec(
+                        badge="OFFLINE", badge_fg=YELLOW, ide=mode, quiet=quiet,
+                        msg=(T("Нет связи с сервером"), MUTED, (FONT, 10), (8, 0)))))
+                else:
+                    specs.append((key, title, accent, spec(msg=failed(res), ide=mode, quiet=quiet)))
                 continue
             seen, rows = set(), []  # убрать дубли (одинаковые имя и квота)
             for r in res.get("limits") or res.get("models") or []:
@@ -438,16 +447,17 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 plan = ("ULTRA" if "ultra" in low else "PRO" if "pro" in low else
                         "FREE" if "starter" in low or "free" in low else plan)
             off = bool(res.get("verify"))  # Google просит подтвердить аккаунт: значок LOGOUT красным, полосы бледные
+            offline = bool(res.get("offline"))  # нет связи (1.5.6): прежние данные, бледные, значок OFFLINE
             summary = self.weekly_left(rows) if folded else None
-            if off and summary:
+            if (off or offline) and summary:
                 summary = (summary[0], FAINT)
             specs.append((key, title, accent, spec(
-                collapsible=True, folded=folded, badge="LOGOUT" if off else plan,
+                collapsible=True, folded=folded, badge="OFFLINE" if offline else "LOGOUT" if off else plan,
                 ide=None if off else mode,  # у LOGOUT нет ни кнопки «→ в …», ни метки IDE (владелец)
-                badge_fg=RED if off else None, dim=off, quiet=quiet,
+                badge_fg=YELLOW if offline else RED if off else None, dim=off or offline, quiet=quiet,
                 badge_tip=T("Google просит подтвердить этот аккаунт (Verify your account).\n"
                             "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
-                            "и не подтвердите аккаунт.") if off else "",
+                            "и не подтвердите аккаунт.") if off and not offline else "",
                 summary=summary,
                 msg=None if rows or folded else (T("Нет данных о лимитах Gemini") if t["kind"] == "google"
                                                  else T("Нет данных о лимитах"), MUTED, (FONT, 10), (8, 0)),

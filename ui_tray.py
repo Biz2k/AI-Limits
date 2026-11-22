@@ -319,10 +319,12 @@ class TrayMixin:
         for key, t in self.data:
             r, accent = t["res"], ACCENT[t["kind"]]
             if not isinstance(r, dict):
-                rows[key] = (t["title"], accent, None, None, "загрузка" if r is None else "ошибка")
+                rows[key] = (t["title"], accent, None, None, "загрузка" if r is None else
+                             "OFFLINE" if L.is_offline(r) else "ошибка")
                 continue
             d = {m["name"]: m["used"] for m in r.get("limits") or r.get("models") or []}
-            rows[key] = (t["title"], accent, d.get("Неделя"), d.get("5 часов"), "IDE" if t["ide"] else None)
+            rows[key] = (t["title"], accent, d.get("Неделя"), d.get("5 часов"),
+                         "OFFLINE" if r.get("offline") else "IDE" if t["ide"] else None)
         rows = [rows[k] for k in self.ordered(list(rows))]
 
         p = tk.Toplevel(self.root)
@@ -359,7 +361,7 @@ class TrayMixin:
             tk.Frame(box, bg=accent, width=3, height=18).grid(row=i, column=0, padx=(0, 8), pady=5)
             tk.Label(box, text=name[:16], bg=CARD, fg=FG, font=(FONT, 10)).grid(row=i, column=1, sticky="w")
             if note:  # своя колонка: метки IDE стоят одна под другой (владелец, 22.11.2026)
-                tk.Label(box, text=T(note), bg=CARD, fg=GREEN if note == "IDE" else (MUTED if note == "загрузка" else RED),
+                tk.Label(box, text=T(note), bg=CARD, fg={"IDE": GREEN, "загрузка": MUTED, "OFFLINE": YELLOW}.get(note, RED),
                          font=(FONT, 8, "bold")).grid(row=i, column=2, sticky="w", padx=(6, 14))
             cell(i, 3, week, 14)
             cell(i, 5, h5, 0)
@@ -391,7 +393,7 @@ class TrayMixin:
         for key, t in tiles or []:
             name, r = t["title"][:14], t["res"]
             if not isinstance(r, dict):
-                lines[key] = f"{name}  {T('загрузка…') if r is None else T('ошибка')}"
+                lines[key] = f"{name}  {T('загрузка…') if r is None else 'OFFLINE' if L.is_offline(r) else T('ошибка')}"
                 continue
             d = {m["name"]: m["used"] for m in r.get("limits") or r.get("models") or []}
             lines[key] = T("{name}  нед {week} · 5ч {five}", name=name, week=fmt(d.get("Неделя")),
