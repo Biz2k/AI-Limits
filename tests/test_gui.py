@@ -637,7 +637,34 @@ def main():
     assert not ent.winfo_exists() and app.names()["claude:me@example.com"] == "Работа"
     assert ccl.title.cget("text") == "Работа" and app.tile_info["claude"]["title"] == "Работа"
     assert accounts.name_error("работа", list(app.names().values())) and accounts.name_error("Codex", [])
-    step("переименование двойным щелчком по имени в плитке; дубликат и название программы не применяются")
+    # щелчок мышью в любом месте, кроме поля, — выход из ввода (22.11.2026): годное имя сохраняется, негодное — нет
+    elsewhere = app.cards["a@example.com"].rows[0].label
+    app.begin_rename("claude")
+    yield wait()
+    ent = app.rename_entry
+    ent.event_generate("<Button-1>")                                    # щелчок в само поле — ввод продолжается
+    yield wait()
+    assert ent.winfo_exists()
+    ent.delete(0, "end")
+    ent.insert(0, "Дом")
+    elsewhere.event_generate("<Button-1>")
+    yield wait()
+    assert not ent.winfo_exists() and app.names()["claude:me@example.com"] == "Дом", app.names()
+    app.begin_rename("claude")
+    yield wait()
+    ent = app.rename_entry
+    ent.delete(0, "end")
+    ent.insert(0, "b")                                                  # занято
+    ent.event_generate("<Return>")
+    yield wait()
+    assert ent.winfo_exists()
+    elsewhere.event_generate("<Button-1>")                              # щелчок мимо — выход без сохранения
+    yield wait()
+    assert not ent.winfo_exists() and app.names()["claude:me@example.com"] == "Дом"
+    assert not any("занято" in x for x in texts(ccl.title.master)) and ccl.title.winfo_ismapped()
+    app.set_name("claude:me@example.com", "Работа")
+    yield wait()
+    step("переименование двойным щелчком по имени в плитке; дубликат и название программы не применяются; щелчок мимо")
 
     # «Управление аккаунтами»: раскрывающийся пункт меню ⚙ (как «Добавить аккаунт»), группы по сервисам, имя и email
     app.open_menu()

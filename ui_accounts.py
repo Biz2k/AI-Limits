@@ -444,11 +444,13 @@ class AccountsMixin:
 
     # ------------------------------------------------ переименование
     def _rename_entry(self, label, ident, current, on_done=None, font=None):
-        """Поле ввода на месте надписи label: Enter или щелчок мимо — сохранить, Esc — отменить.
-        Занятое или пустое имя не применяется: поле остаётся, рядом — сообщение.
+        """Поле ввода на месте надписи label: Enter — сохранить, Esc — отменить. Занятое или пустое имя по Enter
+        не применяется: поле остаётся, рядом — сообщение. Щелчок мышью в любом месте, кроме поля (в окне программы
+        или в другой программе), — выход из ввода (владелец, 22.11.2026): годное имя сохраняется, негодное — нет.
         Поле уже открыто (повторный ✎, 1.5.4: раньше — TclError «isn't packed») — только фокус в него."""
         open_ent = getattr(label, "_rename_ent", None)
         if open_ent is not None and open_ent.winfo_exists():
+            open_ent._keep = True  # этот же щелчок (✎ того же аккаунта) поле не закрывает
             open_ent.focus_set()
             return open_ent
         parent = label.master
@@ -466,12 +468,12 @@ class AccountsMixin:
         err = tk.Label(parent, bg=CARD, fg=RED, font=(FONT, 8), anchor="w")
         state = {"done": False}
 
-        def close(save):
+        def close(save, leave=False):
             if state["done"]:
                 return
             if save:
                 problem = self.set_name(ident, var.get())
-                if problem:
+                if problem and not leave:
                     err.config(text=problem)
                     if info:
                         err.grid(row=info["row"] + 1, column=info["column"], columnspan=5, sticky="w")
@@ -480,6 +482,7 @@ class AccountsMixin:
                     ent.focus_set()
                     return
             state["done"] = True
+            self._rename_open.discard(closer)
             ent.destroy()
             err.destroy()
             if info:
@@ -492,7 +495,19 @@ class AccountsMixin:
         ent.bind("<Return>", lambda e: close(True))
         ent.bind("<Escape>", lambda e: close(False))
         ent.bind("<FocusOut>", lambda e: self.root.after(150, lambda: ent.winfo_exists() and
-                                                           self.root.focus_get() is not ent and close(True)))
+                                                           self.root.focus_get() is not ent and close(True, True)))
+
+        def closer(widget):
+            if getattr(ent, "_keep", False):
+                ent._keep = False
+            elif widget is not ent:
+                close(True, True)
+        if not hasattr(self, "_rename_open"):
+            self._rename_open = set()
+            # щелчок в любом окне программы; ставится один раз, после всех своих обработчиков виджета
+            self.root.bind_all("<Button-1>", lambda e: [c(e.widget) for c in list(self._rename_open)], add="+")
+        # в набор — после текущего щелчка (✎ или двойной щелчок), иначе он сам закрыл бы только что открытое поле
+        self.root.after_idle(lambda: state["done"] or self._rename_open.add(closer))
         ent.focus_set()
         ent.select_range(0, "end")
         label._rename_ent = ent
