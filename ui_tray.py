@@ -338,30 +338,31 @@ class TrayMixin:
         tk.Label(head, text="AI Limits", bg=CARD, fg=FG, font=(FONT_D, 11, "bold")).pack(side="left")
         tk.Label(head, text=self.status.cget("text").split("  ·")[0], bg=CARD, fg=FAINT,
                  font=(FONT, 8)).pack(side="right")
-        for c, t in ((2, T("неделя")), (5, T("5 часов"))):
+        for c, t in ((3, T("неделя")), (5, T("5 часов"))):
             tk.Label(box, text=t, bg=CARD, fg=FAINT, font=(FONT, 8)).grid(row=1, column=c, columnspan=2, sticky="w")
 
-        def cell(row, col, used):
+        def cell(row, col, used, gap):
+            # gap — отступ справа от процентов; у последнего столбца 0: справа остаётся только поле окна, как слева
+            # до цветных полос (владелец, 22.11.2026)
             if used is None:
                 Bar(box, 0, FAINT, width=90).grid(row=row, column=col, padx=(0, 6), sticky="we")
                 tk.Label(box, text="—", bg=CARD, fg=FAINT, font=(FONT, 10), width=5,
-                         anchor="e").grid(row=row, column=col + 1, padx=(0, 14))
+                         anchor="e").grid(row=row, column=col + 1, padx=(0, gap))
             else:
                 col_ = color_for(used, self.warn)
                 Bar(box, used, col_, width=90).grid(row=row, column=col, padx=(0, 6), sticky="we")
                 tk.Label(box, text=f"{used:.0f}%", bg=CARD, fg=col_, font=(FONT, 10, "bold"),
-                         width=5, anchor="e").grid(row=row, column=col + 1, padx=(0, 14))
+                         width=5, anchor="e").grid(row=row, column=col + 1, padx=(0, gap))
 
+        box.grid_columnconfigure(2, minsize=14)  # колонка метки IDE; без меток — просто отступ до полос
         for i, (name, accent, week, h5, note) in enumerate(rows, start=2):
             tk.Frame(box, bg=accent, width=3, height=18).grid(row=i, column=0, padx=(0, 8), pady=5)
-            nm = tk.Frame(box, bg=CARD)
-            nm.grid(row=i, column=1, sticky="w", padx=(0, 14))
-            tk.Label(nm, text=name[:16], bg=CARD, fg=FG, font=(FONT, 10)).pack(side="left")
-            if note:
-                tk.Label(nm, text=T(note), bg=CARD, fg=GREEN if note == "IDE" else (MUTED if note == "загрузка" else RED),
-                         font=(FONT, 8, "bold")).pack(side="left", padx=(6, 0))
-            cell(i, 2, week)
-            cell(i, 5, h5)
+            tk.Label(box, text=name[:16], bg=CARD, fg=FG, font=(FONT, 10)).grid(row=i, column=1, sticky="w")
+            if note:  # своя колонка: метки IDE стоят одна под другой (владелец, 22.11.2026)
+                tk.Label(box, text=T(note), bg=CARD, fg=GREEN if note == "IDE" else (MUTED if note == "загрузка" else RED),
+                         font=(FONT, 8, "bold")).grid(row=i, column=2, sticky="w", padx=(6, 14))
+            cell(i, 3, week, 14)
+            cell(i, 5, h5, 0)
 
         p.update_idletasks()
         w, h = p.winfo_reqwidth(), p.winfo_reqheight()

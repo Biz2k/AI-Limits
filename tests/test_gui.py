@@ -205,6 +205,14 @@ def main():
     app.show_popup()
     yield wait()
     assert not any("хватит" in t for t in texts(app.popup)), texts(app.popup)
+    box = app.popup.winfo_children()[0]
+    labels = [w for w in walk_all(box) if isinstance(w, tk.Label)]
+    xs = {w.winfo_x() for w in labels if w.cget("text") == "IDE"}
+    assert xs and len(xs) == 1, xs                                      # метки IDE — одна под другой
+    right = max(w.winfo_x() + w.winfo_width() for w in labels if w.cget("text").endswith("%"))
+    strips = [w for w in box.grid_slaves(column=0) if isinstance(w, tk.Frame) and int(w.grid_info()["row"]) > 1]
+    left = min(w.winfo_x() for w in strips)
+    assert box.winfo_width() - right == left, (box.winfo_width() - right, left)  # поля справа и слева равны
     app.hide_popup()
     step("график расхода по щелчку на строке, повторный щелчок закрывает; в мини-окне трея прогноза нет")
 
