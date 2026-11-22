@@ -341,6 +341,19 @@ def main():
             yield wait()
             assert any(("week" if code == "en" else "тиждень") == t for t in texts(app.popup)), texts(app.popup)
             app.hide_popup()
+    # язык — щелчком в открытом меню: окно меню и плитки те же, надписи переведены на месте (1.5.6)
+    before = dict(app.cards)
+    app.open_menu()
+    yield wait()
+    win = app.menu_win
+    next(w for w in walk_all(win) if isinstance(w, tk.Label) and w.cget("text") == "English").event_generate("<Button-1>")
+    yield wait()
+    assert app.menu_win is win and "Language" in texts(win) and "Язык" not in texts(win), texts(win)
+    assert all(app.cards[k] is c for k, c in before.items()) and "Week" in seen()
+    next(w for w in walk_all(win) if isinstance(w, tk.Label) and w.cget("text") == "Русский").event_generate("<Button-1>")
+    yield wait()
+    assert app.menu_win is win and "Язык" in texts(win) and "Неделя" in seen()
+    app.close_menu()
     assert i18n.T("нет такого перевода") == "нет такого перевода"
     step("язык интерфейса: английский, украинский и русский переключаются на лету и сохраняются")
 
@@ -699,15 +712,22 @@ def main():
     def menu_item(name):
         return next(w for w in app.menu_win.winfo_children()[0].winfo_children() if name in texts(w))
     assert "Работа" not in texts(app.menu_win)                           # открывается свёрнутым
+    win = app.menu_win
     menu_item("Добавить аккаунт").winfo_children()[-1].event_generate("<Button-1>")
-    yield wait()
-    colors = {w.cget("text").strip(): w.cget("fg") for w in app.menu_win.winfo_children()[0].winfo_children()
-              for w in w.winfo_children() if isinstance(w, tk.Label) and w.cget("text").strip() in ("Claude", "ChatGPT", "Google")}
+    clip = app._menu["sections"]["add"]["clip"]                         # раскрывается плавно (1.5.6)
+    yield wait(0.05)
+    full = app._menu["sections"]["add"]["inner"].winfo_reqheight()
+    assert 1 <= clip.winfo_height() < full, (clip.winfo_height(), full)
+    yield wait(0.4)
+    assert abs(clip.winfo_height() - full) <= 1 and app.menu_win is win, (clip.winfo_height(), full)
+    colors = {w.cget("text").strip(): w.cget("fg") for w in walk_all(app.menu_win)
+              if isinstance(w, tk.Label) and w.cget("text").strip() in ("Claude", "ChatGPT", "Google")
+              and w.master.master.master is clip}
     assert colors == {"Claude": G.ACCENT["claude"], "ChatGPT": G.ACCENT["chatgpt"], "Google": G.ACCENT["google"]}, colors
     item = menu_item("Управление аккаунтами")
     assert item.winfo_children()[0].cget("text") == "▸"
     item.winfo_children()[-1].event_generate("<Button-1>")
-    yield wait()
+    yield wait(0.4)
     t = texts(app.menu_win)
     for need in ("Управление аккаунтами", "Claude", "ChatGPT", "Google", "Работа", "me@example.com  ·  из программы",
                  "a", "a@example.com", "b", "b@example.com", "Поверх всех окон", "▾"):
@@ -737,8 +757,9 @@ def main():
     yield wait()
     assert not first.winfo_exists() and "Работа" in texts(app.menu_win), texts(app.menu_win)
     menu_item("Управление аккаунтами").winfo_children()[-1].event_generate("<Button-1>")  # повторный щелчок — свернуть
-    yield wait()
+    yield wait(0.4)
     assert "Работа" not in texts(app.menu_win) and "Добавить аккаунт" in texts(app.menu_win)
+    assert app.menu_win is win                                          # всё — в том же окне меню
     app.close_menu()
     step("«Управление аккаунтами» — раскрывающийся пункт меню ⚙, группы по сервисам, имя и email мелко;"
          " сервисы в «Добавить аккаунт» — их цветами")

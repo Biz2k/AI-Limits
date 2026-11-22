@@ -72,14 +72,21 @@ class RowView:
         self.pct.grid(row=0, column=5)
         self.nodata = tk.Label(top, text=T("нет данных"), bg=CARD, fg=FAINT, font=(FONT, 9, "italic"))
         self.nodata.grid(row=0, column=5, sticky="e")
-        Tooltip(self.nodata, T("Облако сейчас отдаёт только другой лимит.\nЗначение появится, когда он сбросится,\n"
-                               "или если войти этим аккаунтом в IDE Antigravity."))
+        self.nodata_tip = Tooltip(self.nodata, "")
+        self.retranslate()
         self.bar = Bar(self.f, 0, FAINT)
         self.bar.pack(fill="x", pady=(4, 0))
         if on_click:
             for w in (self.f, top, self.bar, *top.winfo_children()):
                 w.bind("<Button-1>", lambda e: on_click(self.f), add="+")
                 w.config(cursor="hand2")
+
+    def retranslate(self):
+        """Надписи строки — на текущем языке (смена языка без пересоздания, 1.5.6)."""
+        _set(self.label, text=T(self.name))
+        _set(self.nodata, text=T("нет данных"))
+        self.nodata_tip.text = T("Облако сейчас отдаёт только другой лимит.\nЗначение появится, когда он сбросится,\n"
+                                 "или если войти этим аккаунтом в IDE Antigravity.")
 
     def update(self, used, resets_at, seen, warn, dim=False, quiet=False):
         """dim — аккаунт отключён (Google просит подтвердить его): процент и полоса приглушены.
@@ -194,6 +201,13 @@ class CardView:
         drag = getattr(self.app, "_drag", None) or getattr(self.app, "_dnd", None) or {}
         base = self.strip_color()
         self.strip.config(bg=lighter(base) if on or drag.get("card") is self else base)
+
+    def retranslate(self):
+        """Смена языка (1.5.6): строки лимитов меняют текст на месте; метку и кнопку «→ в …» следующий update
+        перепишет заново (ide_mode сброшен). Остальные надписи приходят в spec при render."""
+        for r in self.rows:
+            r.retranslate()
+        self.ide_mode = False  # не None и не строка
 
     def update(self, spec, warn):
         self.collapsible = spec["collapsible"]

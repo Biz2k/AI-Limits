@@ -402,9 +402,17 @@ class AccountsMixin:
 
     # ------------------------------------------------ «Управление аккаунтами» (раскрывающийся пункт меню ⚙)
     def show_accounts(self):
-        """Меню ⚙ с раскрытым «Управлением аккаунтами» (1.5.3: раньше — отдельное окно на месте меню)."""
+        """Меню ⚙ с раскрытым «Управлением аккаунтами» (1.5.3: раньше — отдельное окно на месте меню). Меню уже
+        открыто — меняется только этот список (1.5.6: без пересоздания окна)."""
         self._menu_manage = True
-        self._show_menu(False)
+        sec = (getattr(self, "_menu", None) or {}).get("sections", {}).get("manage")
+        if getattr(self, "menu_win", None) and sec:
+            if sec["open"]:
+                self._menu_accounts_refresh()
+            else:
+                self._menu_toggle("manage", True)
+        else:
+            self._show_menu(False)
 
     def accounts_list(self, box, redraw):
         """Аккаунты по сервисам внутри меню: группа — цветом сервиса, строка — имя и мелко email, ✎ и ✕."""

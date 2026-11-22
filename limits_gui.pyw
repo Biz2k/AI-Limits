@@ -466,7 +466,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         if self.footer is None:  # «макс. email 100%» — справа в строке статуса
             self.footer = tk.Frame(self.status_row, bg=BG)
             self._footer_on = False
-            tk.Label(self.footer, text=T("макс."), bg=BG, fg=FAINT, font=(FONT, 9)).pack(side="left", padx=(0, 5))
+            self.footer_max = tk.Label(self.footer, text=T("макс."), bg=BG, fg=FAINT, font=(FONT, 9))
+            self.footer_max.pack(side="left", padx=(0, 5))
             self.footer_email = tk.Label(self.footer, bg=BG, fg=GOOGLE, font=(FONT, 9))
             self.footer_email.pack(side="left", padx=(0, 5))
             self.footer_pct = tk.Label(self.footer, bg=BG, fg=GREEN, font=(FONT, 10, "bold"))

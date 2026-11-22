@@ -2,6 +2,7 @@
 import ctypes
 import ctypes.wintypes
 import os
+import time
 import tkinter as tk
 from tkinter import font as tkfont
 
@@ -14,6 +15,7 @@ from ui_theme import (
     RED, YELLOW,
     color_for)
 from autostart import autostart_enabled, set_autostart
+from ui_cards import _set
 
 POINTER_GAP = 24  # окно подтверждения у указателя мыши — с таким зазором, чтобы не перекрывать то, что под ним
 
@@ -129,48 +131,65 @@ class PopupsMixin:
             self._menu_manage = False  # «Управление аккаунтами» открывается свёрнутым
             self._show_menu(False, fade=True)
 
-    def _show_menu(self, show_remove, fade=False):
-        """Своё тёмное меню настроек: отметки и выбор видны на тёмном фоне. fade — плавно проявить (открытие
-        кнопкой ⚙; при перерисовке после щелчка по пункту меню не мигает).
-        Меню уже открыто (щелчок по галочке, порогу, языку…) — окно то же, меняется только содержимое: новое
-        собирается целиком и заменяет прежнее за один проход, без пустого кадра (1.5.6, владелец: «мерцание»)."""
-        p = getattr(self, "menu_win", None)
-        if p is not None and not fade and p.winfo_exists():
-            old = p.winfo_children()
-        else:
-            self.close_menu()
-            p = tk.Toplevel(self.root)
-            if fade:
-                fade_in(p)
-            p.overrideredirect(True)
-            p.attributes("-topmost", True)
-            p.configure(bg=LINE)
-            old = []
-        box = tk.Frame(p, bg=CARD, padx=6, pady=6)  # упаковывается после сборки — см. конец
+    MENU_ANIM_MS = 180  # раскрытие и сворачивание «Добавить аккаунт» и «Управление аккаунтами»
+
+    def _show_menu(self, show_remove=False, fade=False):
+        """Своё тёмное меню настроек. Собирается один раз при открытии; дальше щелчки по галочкам, порогам,
+        автообновлению и языку меняют только сами эти элементы (`_menu_sync`), а «Добавить аккаунт» и «Управление
+        аккаунтами» плавно раскрываются внутри того же окна (`_menu_toggle`) — 1.5.6, владелец: «мерцание при каждом
+        изменении», «анимация разворачивания». show_remove — выбор сервиса в «Добавить аккаунт» сразу раскрыт;
+        «Управление аккаунтами» — по self._menu_manage. fade — плавно проявить (открытие кнопкой ⚙)."""
+        self.close_menu()
+        p = tk.Toplevel(self.root)
+        if fade:
+            fade_in(p)
+        p.overrideredirect(True)
+        p.attributes("-topmost", True)
+        p.configure(bg=LINE)
+        box = tk.Frame(p, bg=CARD, padx=6, pady=6)
+        box.pack(padx=1, pady=1)
         self.menu_win = p
+        m = self._menu = {"tr": [], "sync": [], "sections": {}}
+
+        def tr(w, text):  # надпись, которая меняется при смене языка: запоминаем русский исходник
+            w._ru = text
+            m["tr"].append(w)
+            return w
 
         mark_w = tkfont.Font(font=(FONT, 10, "bold")).measure("00") + 4  # ширина колонки отметок
         sz = max(13, round(self.root.winfo_fpixels("1i") / 96 * 14))    # сторона квадрата чекбокса
 
-        def item(text, cmd, enabled=True, mark=None, fg=FG, check=None):
-            row = tk.Frame(box, bg=CARD, cursor="hand2" if enabled else "arrow")
+        def item(parent, text, cmd, enabled=True, mark=None, fg=FG, check=None, translate=True):
+            """Строка меню. mark — функция, отдающая значок ▸/▾; check — функция, отдающая состояние галочки."""
+            row = tk.Frame(parent, bg=CARD, cursor="hand2" if enabled else "arrow")
             row.pack(fill="x")
             if check is None:
-                tk.Label(row, text=mark or "", bg=CARD, fg=MUTED, width=2,
-                         font=(FONT, 10, "bold")).pack(side="left")
+                mk = tk.Label(row, text="", bg=CARD, fg=MUTED, width=2, font=(FONT, 10, "bold"))
+                mk.pack(side="left")
+                if mark:
+                    m["sync"].append(lambda: _set(mk, text=mark()))
             else:  # чекбокс: пустой квадрат виден и без отметки
                 cb = tk.Canvas(row, width=mark_w, height=sz + 2, bg=CARD, highlightthickness=0)
                 cb.pack(side="left")
                 x0 = (mark_w - sz) // 2
-                on_ = check and enabled
-                cb.create_rectangle(x0, 1, x0 + sz, 1 + sz, outline=BLUE if on_ else (MUTED if enabled else FAINT),
-                                    fill=BLUE if on_ else CARD_HI)
-                if check:
-                    cb.create_line(x0 + sz * .22, 1 + sz * .52, x0 + sz * .42, 1 + sz * .72,
-                                   x0 + sz * .78, 1 + sz * .28, fill="white" if enabled else FAINT,
-                                   width=max(2, sz // 7), capstyle="round", joinstyle="round")
-            lb = tk.Label(row, text=text, bg=CARD, fg=fg if enabled else FAINT,
+                rect = cb.create_rectangle(x0, 1, x0 + sz, 1 + sz)
+                tick = cb.create_line(x0 + sz * .22, 1 + sz * .52, x0 + sz * .42, 1 + sz * .72,
+                                      x0 + sz * .78, 1 + sz * .28, fill="white" if enabled else FAINT,
+                                      width=max(2, sz // 7), capstyle="round", joinstyle="round")
+
+                def draw():
+                    on_ = bool(check())
+                    if getattr(cb, "_on", None) is not on_:  # меняется только квадрат, и только при смене
+                        cb._on = on_
+                        lit = on_ and enabled
+                        cb.itemconfig(rect, outline=BLUE if lit else (MUTED if enabled else FAINT),
+                                      fill=BLUE if lit else CARD_HI)
+                        cb.itemconfig(tick, state="normal" if on_ else "hidden")
+                m["sync"].append(draw)
+            lb = tk.Label(row, text=T(text) if translate else text, bg=CARD, fg=fg if enabled else FAINT,
                           font=(FONT, 10), anchor="w", padx=4, pady=5)
+            if translate:
+                tr(lb, text)
             lb.pack(side="left", fill="x", expand=True)
             if enabled:
                 def on(_e, c=CARD_HI):
@@ -186,116 +205,219 @@ class PopupsMixin:
             tk.Frame(box, bg=LINE, height=1).pack(fill="x", pady=5, padx=4)
 
         def chips(title, options, current, setter):
-            tk.Label(box, text=title, bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",
-                     padx=28).pack(fill="x", pady=(4, 2))
+            """Ряд кнопок выбора; options — (надпись, значение, переводить ли); current — функция."""
+            tr(tk.Label(box, text=T(title), bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w", padx=28),
+               title).pack(fill="x", pady=(4, 2))
             row = tk.Frame(box, bg=CARD)
             row.pack(fill="x", padx=(28, 8), pady=(0, 4))
-            for label, val in options:
-                sel = val == current
-                ch = tk.Label(row, text=label, bg=BLUE if sel else CARD_HI,
-                              fg="white" if sel else MUTED, font=(FONT, 9, "bold" if sel else "normal"),
-                              padx=9, pady=3, cursor="hand2")
+            group = []
+            for label, val, translate in options:
+                ch = tk.Label(row, text=T(label) if translate else label, padx=9, pady=3, cursor="hand2")
+                if translate:
+                    tr(ch, label)
                 ch.pack(side="left", padx=(0, 4))
-                ch.bind("<Button-1>", lambda e, v=val: (setter(v), self._show_menu(show_remove)))
+                ch.bind("<Button-1>", lambda e, v=val: (setter(v), self._menu_sync()))
+                group.append((ch, val))
+
+            def draw():
+                cur = current()
+                for ch, val in group:
+                    sel = val == cur
+                    _set(ch, bg=BLUE if sel else CARD_HI, fg="white" if sel else MUTED,
+                         font=(FONT, 9, "bold" if sel else "normal"))
+            m["sync"].append(draw)
+
+        def section(key, title, build, opened):
+            """Раскрывающийся пункт: заголовок ▸/▾ и под ним рамка clip, которая при анимации обрезает содержимое."""
+            sec = {"open": opened, "anim": None, "build": build}
+            sec["head"] = item(box, title, lambda: self._menu_toggle(key), mark=lambda: "▾" if sec["open"] else "▸")
+            sec["clip"] = clip = tk.Frame(box, bg=CARD)
+            sec["inner"] = inner = tk.Frame(clip, bg=CARD)
+            m["sections"][key] = sec
+            if opened:
+                build(inner)
+                inner.pack(fill="x")
+                clip.pack(fill="x", after=sec["head"])
 
         def run(fn):
             self.close_menu()
             fn()
 
-        # «Добавить аккаунт» раскрывает выбор сервиса (show_remove здесь — раскрыт ли этот выбор); названия
-        # сервисов — их цветами, как в «Управлении аккаунтами» (1.5.3, владелец)
-        item(T("Добавить аккаунт"), lambda: self._show_menu(not show_remove), mark="▾" if show_remove else "▸")
-        if show_remove:
+        def build_add(parent):  # названия сервисов — их цветами, как в «Управлении аккаунтами» (1.5.3, владелец)
             for kind, label, color in (("claude", "Claude", CLAUDE), ("chatgpt", "ChatGPT", CODEX),
                                        ("google", "Google", GOOGLE)):
-                item("   " + label, lambda k=kind: run(lambda: self.add_account(k)), fg=color)
-        manage = getattr(self, "_menu_manage", False)  # «Управление аккаунтами» — раскрывающийся список (1.5.3)
+                item(parent, "   " + label, lambda k=kind: run(lambda: self.add_account(k)), fg=color,
+                     translate=False)
 
-        def toggle_manage():
-            self._menu_manage = not manage
-            self._show_menu(show_remove)
-        item(T("Управление аккаунтами"), toggle_manage, mark="▾" if manage else "▸")
-        if manage:
-            self.accounts_list(box, lambda: self._show_menu(show_remove))
+        section("add", "Добавить аккаунт", build_add, bool(show_remove))
+        section("manage", "Управление аккаунтами", lambda parent: self.accounts_list(parent, self._menu_accounts_refresh),
+                bool(getattr(self, "_menu_manage", False)))
         sep()
-        topmost = bool(self.root.attributes("-topmost"))
-        item(T("Поверх всех окон"),
-             lambda: (self.root.attributes("-topmost", not topmost), self.persist(),
-                      self._show_menu(show_remove)),
-             check=topmost)
+
+        def toggle_topmost():
+            self.root.attributes("-topmost", not self.root.attributes("-topmost"))
+            self.persist()
+            p.lift()  # окно программы поднялось поверх — меню снова над ним
 
         def toggle_minimize_to_tray():
             self.s["minimize_to_tray"] = not self.s.get("minimize_to_tray")
             self.persist()
-            self._show_menu(show_remove)
 
         def toggle_close_to_tray():
             self.s["close_to_tray"] = not self.s.get("close_to_tray")
             self.persist()
             if getattr(self, "tray", None):  # иконка в трее появляется/исчезает сразу
                 (self.tray.show if self.s["close_to_tray"] else self.tray.hide)()
-            self._show_menu(show_remove)
 
         def toggle_autostart():
             try:
                 set_autostart(not autostart_enabled())
             except Exception as e:
                 self.say(T("Автозапуск: {error}", error=e), RED)
-            self._show_menu(show_remove)
 
         def toggle_forecast_alerts():
             self.s["forecast_alerts"] = not self.s.get("forecast_alerts")
             self.persist()
-            self._show_menu(show_remove)
 
-        item(T("Сворачивать в трей"), toggle_minimize_to_tray,
-             enabled=bool(getattr(self, "tray", None)), check=bool(self.s.get("minimize_to_tray")))
-        item(T("Сворачивать в трей при закрытии"), toggle_close_to_tray,
-             enabled=bool(getattr(self, "tray", None)), check=bool(self.s.get("close_to_tray")))
-        item(T("Автозапуск после старта системы"), toggle_autostart, enabled=os.name == "nt",
-             check=autostart_enabled())
-        item(T("Предупреждения по прогнозу"), toggle_forecast_alerts, check=bool(self.s.get("forecast_alerts")))
-        item(T("Карточки в две колонки"),  # окно меняет ширину — меню открывается заново под кнопкой ⚙
-             lambda: (self.toggle_two_columns(), self.root.update(), self._show_menu(show_remove)),
-             check=bool(self.s.get("two_columns")))
-        chips(T("Автообновление"), [(T(n), s) for n, s in INTERVALS], self.interval, self.set_interval)
-        chips(T("Порог предупреждения"), [(f"{v}%", v) for v in (70, 80, 90, 95)] + [(T("выкл"), 0)], int(self.warn),
-              lambda v: self.set_warn(v))
-        chips(T("Язык"), [(name, code) for code, name in i18n.LANGS], i18n.lang(), self.set_lang)
+        def toggle_two_columns():  # окно меняет ширину — меню переезжает под кнопку ⚙
+            self.toggle_two_columns()
+            self.root.update()
+
+        tray = bool(getattr(self, "tray", None))
+        for text, fn, enabled, check in (
+                ("Поверх всех окон", toggle_topmost, True, lambda: bool(self.root.attributes("-topmost"))),
+                ("Сворачивать в трей", toggle_minimize_to_tray, tray, lambda: self.s.get("minimize_to_tray")),
+                ("Сворачивать в трей при закрытии", toggle_close_to_tray, tray, lambda: self.s.get("close_to_tray")),
+                ("Автозапуск после старта системы", toggle_autostart, os.name == "nt", autostart_enabled),
+                ("Предупреждения по прогнозу", toggle_forecast_alerts, True, lambda: self.s.get("forecast_alerts")),
+                ("Карточки в две колонки", toggle_two_columns, True, lambda: self.s.get("two_columns"))):
+            item(box, text, lambda fn=fn: (fn(), self._menu_sync()), enabled=enabled, check=check)
+        chips("Автообновление", [(n, s, True) for n, s in INTERVALS], lambda: self.interval, self.set_interval)
+        chips("Порог предупреждения", [(f"{v}%", v, False) for v in (70, 80, 90, 95)] + [("выкл", 0, True)],
+              lambda: int(self.warn), self.set_warn)
+        chips("Язык", [(name, code, False) for code, name in i18n.LANGS], i18n.lang, self.set_lang)
         sep()
-        item(T("Открыть папку данных"), lambda: run(self.open_data_folder))
+        item(box, "Открыть папку данных", lambda: run(self.open_data_folder))
         tk.Label(box, text=f"AI Limits {L.__version__}", bg=CARD, fg=FAINT, font=(FONT, 8), anchor="e",
                  padx=8).pack(fill="x", pady=(2, 0))
 
-        for w in old:
-            w.destroy()
-        box.pack(padx=1, pady=1)
-        p.update_idletasks()
-        bx = self.menu_btn.winfo_rootx()
-        by = self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4
-        # правый край меню — не дальше правого края кнопки «Обновить» (поле содержимого окна)
-        right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
-        bx = min(bx, right - p.winfo_reqwidth())
-        p.geometry(f"+{bx}+{by}")
+        for f in m["sync"]:
+            f()
+        self._menu_place()
         # закрыть по Esc и по щелчку вне меню
         p.bind("<Escape>", self.close_menu)
         p.focus_force()
         p.bind("<FocusOut>", lambda e: self.root.after(120, self._menu_focus_check))
 
+    def _menu_sync(self):
+        """Привести открытое меню к настройкам: галочки, выбранные кнопки, значки ▸/▾, язык надписей. Меняется
+        только то, что изменилось (`_set`), окно и остальные элементы не пересоздаются."""
+        m, p = getattr(self, "_menu", None), getattr(self, "menu_win", None)
+        if not m or not p or not p.winfo_exists():
+            return
+        for w in m["tr"]:
+            if w.winfo_exists():
+                _set(w, text=T(w._ru))
+        for f in m["sync"]:
+            f()
+        self._menu_place()
+
+    def _menu_place(self):
+        """Меню под кнопкой ⚙; правый край — не дальше правого края кнопки «Обновить» (поле содержимого окна)."""
+        p = getattr(self, "menu_win", None)
+        if not p or not p.winfo_exists():
+            return
+        p.update_idletasks()
+        bx = self.menu_btn.winfo_rootx()
+        by = self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4
+        right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
+        geo = f"+{min(bx, right - p.winfo_reqwidth())}+{by}"
+        if getattr(p, "_geo", None) != geo:
+            p._geo = geo
+            p.geometry(geo)
+
+    def _menu_toggle(self, key, open_=None):
+        """Раскрыть или свернуть пункт меню с анимацией: рамка clip плавно меняет высоту (ease-out,
+        MENU_ANIM_MS), содержимое под ней лежит целиком и открывается сверху вниз."""
+        m = getattr(self, "_menu", None)
+        if not m or key not in m["sections"]:
+            return
+        sec = m["sections"][key]
+        want = (not sec["open"]) if open_ is None else bool(open_)
+        if key == "manage":
+            self._menu_manage = want
+        if want == sec["open"]:
+            return
+        sec["open"] = want
+        self._menu_sync()  # ▸ → ▾
+        clip, inner = sec["clip"], sec["inner"]
+        cur = clip.winfo_height() if clip.winfo_manager() else 0
+        if want and not sec["anim"]:  # содержимое собирается заново — список аккаунтов всегда свежий
+            for w in inner.winfo_children():
+                w.destroy()
+            sec["build"](inner)
+        inner.pack_forget()
+        inner.place(x=0, y=0, relwidth=1)
+        clip.pack_propagate(False)
+        clip.update_idletasks()
+        clip.config(width=inner.winfo_reqwidth(), height=max(cur, 1))
+        if not clip.winfo_manager():
+            clip.pack(fill="x", after=sec["head"])
+        start, end = cur, inner.winfo_reqheight() if want else 0
+        t0, token = time.monotonic(), object()
+        sec["anim"] = token
+
+        def step():
+            if sec["anim"] is not token or not clip.winfo_exists():
+                return  # меню закрыли или пункт щёлкнули снова — эта анимация больше не нужна
+            k = min(1.0, (time.monotonic() - t0) * 1000 / self.MENU_ANIM_MS)
+            clip.config(height=max(1, round(start + (end - start) * (1 - (1 - k) ** 3))))
+            self._menu_place()
+            if k < 1:
+                self.root.after(12, step)
+                return
+            sec["anim"] = None
+            if want:  # дальше рамка снова подстраивается под содержимое (поле имени, сообщение об ошибке)
+                inner.place_forget()
+                inner.pack(fill="x")
+                clip.pack_propagate(True)
+            else:
+                clip.pack_forget()
+                for w in inner.winfo_children():
+                    w.destroy()
+            self._menu_place()
+        step()
+
+    def _menu_accounts_refresh(self):
+        """Список «Управления аккаунтами» собрать заново (переименовали, удалили, сменили язык): новый собирается
+        рядом и заменяет прежний за один проход; остальное меню не трогается."""
+        sec = (getattr(self, "_menu", None) or {}).get("sections", {}).get("manage")
+        p = getattr(self, "menu_win", None)
+        if not sec or not p or not p.winfo_exists() or not sec["open"] or sec["anim"]:
+            return
+        new = tk.Frame(sec["clip"], bg=CARD)
+        sec["build"](new)
+        sec["inner"].destroy()
+        new.pack(fill="x")
+        sec["inner"] = new
+        self._menu_place()
+
     def set_lang(self, code):
-        """Смена языка интерфейса. Надписи, созданные один раз (кнопки, карточки, строка «Максимум»),
-        пересоздаются; прогнозы пересчитываются — в них есть текст."""
+        """Смена языка интерфейса. С 1.5.6 карточки и строка «макс.» не пересоздаются: уже показанным надписям
+        подставляется новый текст (`CardView.retranslate`), остальное делает обычный render; прогнозы
+        пересчитываются — в них есть текст. Меню ⚙ переводит само себя (`_menu_sync` после щелчка)."""
+        if code == i18n.lang():
+            return
         i18n.set_lang(code)
         self.s["lang"] = i18n.lang()
         self.persist()
         self.refresh_btn.config(text=T("⟳  Обновить"))
         self.menu_tip.text = T("Настройки")
         for card in self.cards.values():
-            card.outer.destroy()
+            card.retranslate()
         if self.footer is not None:
-            self.footer.destroy()
-        self.cards, self.card_order, self.footer = {}, [], None
-        self._last_sig = None
+            self.footer_max.config(text=T("макс."))
+        self._menu_accounts_refresh()
         if self.data:
             self.update_history()
             self.render(self.data)
