@@ -145,6 +145,10 @@ def main():
     assert app.names() == {"a@example.com": "a", "b@example.com": "b"} and app.s["accounts_v"] == 2
     assert app.cards["a@example.com"].title.cget("text") == "a" and app.cards["b@example.com"].title.cget("text") == "b"
     assert app.status.cget("text").startswith("Обновлено")
+    # сохранённые ширина и положение — как есть (1.5.6; раньше при запуске запоминалось «1x1» и окно сужалось);
+    # высоту дальше подгоняет autofit, когда меняется высота содержимого
+    assert root.geometry().startswith("500x") and root.geometry().endswith("+120+80"), root.geometry()
+    assert SAVED and all(not s.get("geometry", "").startswith("1x1") for s in SAVED), [s.get("geometry") for s in SAVED]
     step("плитки программ (Claude Code без имени, Antigravity под именем аккаунта IDE) и добавленный аккаунт;"
          " данные IDE важнее облачных; имена Google-аккаунтов — из email")
 
@@ -307,6 +311,29 @@ def main():
     yield wait(0.4)
     assert not sb.shown and not sb.winfo_ismapped()
     step("полоса прокрутки: тонкая, только когда карточки не помещаются, в правом поле; тянется и листает")
+
+    # размер и положение окна (1.5.6): сохраняются после перемещения и изменения размера; в две колонки окно не
+    # уже двух карточек; положение за пределами мониторов — на экран
+    n0 = len(SAVED)
+    root.geometry(f"{root.winfo_width()}x{root.winfo_height() - 20}+150+90")
+    yield wait(1.0)
+    assert len(SAVED) > n0 and SAVED[-1]["geometry"] == root.geometry() and SAVED[-1]["geometry"].endswith("+150+90"),         SAVED[-1].get("geometry")
+    k = root.winfo_fpixels("1i") / 96
+    app.s["two_columns"] = True
+    app.apply_minsize()
+    yield wait(0.3)
+    assert root.winfo_width() >= round(2 * 440 - 40 * k), root.winfo_width()
+    app.s["two_columns"] = False
+    app.apply_minsize()
+    root.geometry(f"500x{root.winfo_height()}")
+    app.layout_cards()
+    yield wait(0.3)
+    assert root.winfo_width() == 500, root.winfo_width()
+    assert app.on_screen("500x600+99999+99999") == "500x600+100+100"
+    assert app.on_screen("500x600+150+90") == "500x600+150+90"
+    vh = ctypes.windll.user32.GetSystemMetrics(79)
+    assert app.on_screen(f"500x{vh + 200}+150+0") == f"500x{vh - 120}+150+0"   # выше экрана — по экрану
+    step("окно: размер и положение сохраняются при перемещении; в две колонки не уже двух карточек; вне экрана — на экран")
 
     real_ag = L.ag_fetch
     L.ag_fetch = lambda acc, a=False, l=None: dict(real_ag(acc, a, l), plan="Antigravity Starter Quota")

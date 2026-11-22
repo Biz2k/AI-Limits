@@ -42,6 +42,7 @@ class LayoutMixin:
         w = self.root.winfo_width()
         w = round(2 * w - 40 * k) if two else round((w + 40 * k) / 2)
         w = max(440, min(w, self.root.winfo_screenwidth() - 40))
+        self.apply_minsize()
         self.layout_cards()
         self.fit_height(width=w)
         self.persist()

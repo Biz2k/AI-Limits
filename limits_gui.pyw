@@ -8,6 +8,7 @@ import ctypes.wintypes
 import datetime as dt
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -79,7 +80,14 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         root.title("AI Limits")
         root.configure(bg=BG)
         root.minsize(440, 300)
-        root.geometry(self.s.get("geometry", "500x720"))
+        # размер и положение, выставленные пользователем (1.5.6, владелец: «не запоминает»): сохраняются при каждом
+        # перемещении и изменении размера (`_on_root_configure`), при запуске восстанавливаются как есть —
+        # высота по содержимому поверх них не подгоняется (`_all_done`)
+        self._geo_restored = bool(self.s.get("geometry"))
+        geo = self.on_screen(self.s.get("geometry", "500x720"))
+        root.geometry(geo)
+        self.apply_minsize(geo)
+        root.bind("<Configure>", self._on_root_configure, add="+")
         root.attributes("-topmost", bool(self.s.get("topmost", False)))
         root.protocol("WM_DELETE_WINDOW", self.on_close)
         # меню настроек не должно оставаться на экране, когда окно свёрнуто, спрятано в трей или закрыто
@@ -155,6 +163,52 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.root.geometry(f"{width or self.root.winfo_width()}x{need}+{x}+{y}")
         self._fit_req = self.body.winfo_reqheight()
 
+    def apply_minsize(self, geo=None):
+        """Наименьшая ширина окна: в две колонки — две карточки (иначе они сжимаются до обрезанных имён).
+        Окно уже уже — расширить. geo — строка размера, пока окно ещё не показано (тогда Tk отдаёт 1x1)."""
+        k = self.root.winfo_fpixels("1i") / 96
+        w = round(2 * 440 - 40 * k) if self.s.get("two_columns") else 440
+        self.root.minsize(w, 300)
+        m = re.match(r"(\d+)x(\d+)(.*)", geo or self.root.geometry())
+        if m and int(m[1]) < w:
+            self.root.geometry(f"{w}x{m[2]}{m[3]}")
+
+    def on_screen(self, geo):
+        """Сохранённое положение, если окно попадает на один из мониторов; иначе (монитор отключили) — у левого
+        верхнего угла основного экрана."""
+        try:
+            size, x, y = geo.split("+")[0], int(geo.split("+")[1]), int(geo.split("+")[2])
+        except (IndexError, ValueError):
+            return geo
+        try:
+            gsm = ctypes.windll.user32.GetSystemMetrics  # виртуальный экран: все мониторы вместе
+            vx, vy, vw, vh = gsm(76), gsm(77), gsm(78), gsm(79)
+        except Exception:
+            return geo
+        w, h = (int(v) for v in size.split("x"))
+        if vh and h > vh - 60:  # выше экрана (так бывало: высота по содержимому) — по экрану
+            h, size = vh - 120, f"{w}x{vh - 120}"
+        if vw and not (vx - w + 80 <= x <= vx + vw - 80 and vy <= y <= vy + vh - 60):
+            return f"{size}+100+100"
+        return f"{size}+{x}+{y}"
+
+    def _on_root_configure(self, e):
+        """Окно передвинули или изменили размер — сохранить через полсекунды после последнего изменения."""
+        if e.widget is not self.root:
+            return
+        if getattr(self, "_geo_job", None):
+            self.root.after_cancel(self._geo_job)
+        self._geo_job = self.root.after(600, self._save_geometry)
+
+    def _save_geometry(self):
+        self._geo_job = None
+        if not self._geometry_ok():
+            return  # свёрнутое, развёрнутое на весь экран, спрятанное или ещё не показанное окно не запоминаем
+        geo = self.root.geometry()
+        if geo != self.s.get("geometry"):
+            self.s["geometry"] = geo
+            save_settings(self.s)
+
     def autofit(self):
         """Подогнать высоту окна, если высота содержимого изменилась: свернули/развернули плитку, добавили или
         убрали аккаунт, плитка заполнилась после «Загрузка…». Развёрнутое на весь экран окно не трогаем."""
@@ -173,9 +227,18 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
     def persist(self):
         self.s.update(warn=self.warn, interval=self.interval, all_models=self.all_models,
-                      topmost=bool(self.root.attributes("-topmost")), geometry=self.root.geometry(),
-                      collapsed=sorted(self.collapsed))
+                      topmost=bool(self.root.attributes("-topmost")), collapsed=sorted(self.collapsed))
+        if self._geometry_ok():  # 1.5.6: раньше при запуске сюда попадало «1x1+0+0» (окно ещё не показано),
+            self.s["geometry"] = self.root.geometry()  # и окно открывалось наименьшей ширины
         save_settings(self.s)
+
+    def _geometry_ok(self):
+        """Размер окна можно запоминать: окно показано, обычного размера, его не тащат за плитку."""
+        try:
+            return (self.root.state() == "normal" and self.root.winfo_ismapped() and self.root.winfo_width() > 1
+                    and not getattr(self, "_dnd", None))
+        except tk.TclError:
+            return False
 
     def on_close(self):
         """Кнопка ✕ окна: в трей (если включено в настройках) или выход."""
@@ -295,7 +358,11 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.update_history()  # запись в историю и прогнозы
         if not getattr(self, "_fitted", False) and self.root.state() == "normal":  # высота окна по содержимому
             self._fitted = True
-            self.fit_height()
+            if self._geo_restored:  # размер, сохранённый пользователем, — как есть; дальше autofit как обычно
+                self.root.update_idletasks()
+                self._fit_req = self.body.winfo_reqheight()
+            else:
+                self.fit_height()
         self._updated_at = dt.datetime.now()  # время последнего полного обновления — для строки статуса
         want = getattr(self, "_ide_expect", None)  # после смены аккаунта IDE ждём его данные из самой IDE
         if want:
