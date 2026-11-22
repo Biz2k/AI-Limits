@@ -3,6 +3,7 @@
 Окно открывается на несколько секунд; запросы, настройки, ключи и смена аккаунта IDE подменены —
 настоящие данные и настройки не читаются и не меняются. Запуск: python tests\\test_gui.py
 """
+import ctypes
 import os
 import sys
 import time
@@ -550,6 +551,23 @@ def main():
     yield wait(0.3)
     assert app.warn == 80 and chip("80%").cget("bg") == on and chip("90%").cget("bg") != on and not errors, errors
     assert app.menu_win is win and len(win.winfo_children()) == 1        # то же окно, без мерцания (1.5.6)
+    # «Поверх всех окон» — меню остаётся над окном программы (1.5.6, владелец: уходило на задний план)
+    u32 = ctypes.windll.user32
+
+    def menu_above():
+        top, h = int(app.menu_win.wm_frame(), 16), u32.GetWindow(int(root.wm_frame(), 16), 3)  # GW_HWNDPREV
+        while h:
+            if h == top:
+                return True
+            h = u32.GetWindow(h, 3)
+        return False
+    was_top = bool(root.attributes("-topmost"))
+    for _ in range(2):
+        next(w for w in walk_all(win) if isinstance(w, tk.Label) and w.cget("text") == "Поверх всех окон"
+             ).event_generate("<Button-1>")
+        yield wait(0.3)
+        assert app.menu_win is win and menu_above(), ("меню ушло под окно", root.attributes("-topmost"))
+    assert bool(root.attributes("-topmost")) == was_top
     app.warn = old
     app.close_menu()
     assert not SAVED[-1]["two_columns"] and abs(root.winfo_width() - w0) < 4, (w0, root.winfo_width())

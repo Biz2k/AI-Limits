@@ -257,7 +257,11 @@ class PopupsMixin:
         def toggle_topmost():
             self.root.attributes("-topmost", not self.root.attributes("-topmost"))
             self.persist()
-            p.lift()  # окно программы поднялось поверх — меню снова над ним
+            # окно программы стало поверх всех — меню снова над ним (1.5.6, владелец); Windows переставляет окно
+            # программы не сразу, поэтому — и после обработки события
+            self._menu_raise()
+            self.root.after_idle(self._menu_raise)
+            self.root.after(100, self._menu_raise)
 
         def toggle_minimize_to_tray():
             self.s["minimize_to_tray"] = not self.s.get("minimize_to_tray")
@@ -308,6 +312,18 @@ class PopupsMixin:
         p.bind("<Escape>", self.close_menu)
         p.focus_force()
         p.bind("<FocusOut>", lambda e: self.root.after(120, self._menu_focus_check))
+
+    def _menu_raise(self):
+        """Меню ⚙ — над окном программы. После смены «Поверх всех окон» Windows ставит окно программы выше
+        меню, а lift и повторный -topmost средствами Tk его не поднимают — SetWindowPos(HWND_TOPMOST)."""
+        p = getattr(self, "menu_win", None)
+        if p is not None and p.winfo_exists():
+            try:  # HWND_TOPMOST, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+                swp = ctypes.windll.user32.SetWindowPos
+                swp.argtypes = [ctypes.c_void_p, ctypes.c_void_p] + [ctypes.c_int] * 4 + [ctypes.c_uint]
+                swp(int(p.wm_frame(), 16), ctypes.c_void_p(-1), 0, 0, 0, 0, 0x13)
+            except (AttributeError, OSError, ValueError):
+                p.lift()
 
     def _menu_sync(self):
         """Привести открытое меню к настройкам: галочки, выбранные кнопки, значки ▸/▾, язык надписей. Меняется
