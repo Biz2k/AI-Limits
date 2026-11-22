@@ -835,12 +835,23 @@ def test_google_login_page():
     import urllib.request
     T = i18n.T
     pages, threads, mode = [], [], {}
+    import urllib.error
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **kw):
+            return None
+    no_redirect = urllib.request.build_opener(NoRedirect)
 
     def fake_open(url):  # «браузер»: Google сразу возвращает его на 127.0.0.1 с кодом
         q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
         mode["hint"] = q.get("login_hint", [None])[0]
         cb = q["redirect_uri"][0] + "?" + urllib.parse.urlencode({"code": "c1", "state": q["state"][0]})
-        th = threading.Thread(target=lambda: pages.append(urllib.request.urlopen(cb, timeout=20).read().decode()))
+        def get():  # переадресацию не выполняем — запоминаем её адрес
+            try:
+                pages.append(no_redirect.open(cb, timeout=20).read().decode())
+            except urllib.error.HTTPError as e:
+                pages.append(f"{e.code} {e.headers.get('Location')}")
+        th = threading.Thread(target=get)
         th.start()
         threads.append(th)
 
@@ -878,9 +889,8 @@ def test_google_login_page():
         mode["verify"] = True                                              # Google требует подтвердить аккаунт
         acc = run(login_hint="v@example.com", expect="v@example.com")
         assert mode["hint"] == "v@example.com" and acc["verify_url"].startswith("https://accounts.google.com/")
-        assert T("Google просит подтвердить аккаунт") in pages[0] and "class='btn'" in pages[0]
-        assert "href='https://accounts.google.com/v3/signin/continue?plt=fake&amp;x=1'" in pages[0], pages[0]
-        assert "support.google.com/accounts?p=al_alert" in pages[0]       # «справка Google» под кнопкой
+        # своей страницы нет — браузер сразу уходит на страницу подтверждения Google
+        assert pages[0] == "302 https://accounts.google.com/v3/signin/continue?plt=fake&x=1", pages
         mode["verify"] = False
         msg = expect_error(RuntimeError, lambda: run(expect="other@example.com"))  # выбран другой аккаунт
         assert "other@example.com" in msg and "не обновлён" in msg or "not updated" in msg, msg

@@ -113,6 +113,12 @@ def widgets(w):
     return 1 + sum(widgets(c) for c in w.winfo_children())
 
 
+def walk_all(w):
+    yield w
+    for c in w.winfo_children():
+        yield from walk_all(c)
+
+
 def texts(w):
     out = []
     for c in w.winfo_children():
@@ -484,6 +490,20 @@ def main():
     yield wait(0.5)
     right = app.refresh_btn.winfo_rootx() + app.refresh_btn.winfo_width()
     assert app.menu_win and abs(app.menu_win.winfo_rootx() + app.menu_win.winfo_width() - right) < 4,         "меню не переехало за кнопкой ⚙"
+
+    def chip(text):
+        return next(w for w in walk_all(app.menu_win) if isinstance(w, tk.Label) and w.cget("text") == text)
+    errors = []
+    app.root.report_callback_exception = lambda *a: errors.append(a[1])
+    old = app.warn
+    on = __import__("ui_theme").BLUE                                    # выбранный порог — синий
+    chip("90%").event_generate("<Button-1>")                            # при загруженных данных (22.11.2026:
+    yield wait(0.3)                                                     # render(*data) падал, меню не обновлялось)
+    assert app.warn == 90 and chip("90%").cget("bg") == on and chip("80%").cget("bg") != on, errors
+    chip("80%").event_generate("<Button-1>")
+    yield wait(0.3)
+    assert app.warn == 80 and chip("80%").cget("bg") == on and chip("90%").cget("bg") != on and not errors, errors
+    app.warn = old
     app.close_menu()
     assert not SAVED[-1]["two_columns"] and abs(root.winfo_width() - w0) < 4, (w0, root.winfo_width())
     assert {int(app.cards[k].outer.grid_info()["column"]) for k in app.card_order} == {0}

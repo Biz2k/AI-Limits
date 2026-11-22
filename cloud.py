@@ -588,8 +588,8 @@ def ag_login(login_hint=None, expect=None):
     """OAuth-вход через браузер с приёмом кода на 127.0.0.1. login_hint — email, который Google предложит
     сразу (повторный вход в добавленный аккаунт, 1.5.4). С 1.5.4 страница «Готово» показывается только после
     обмена кода на токен, получения email (expect — нужный email: другой — отказ) и проверки облака: если Google
-    требует подтвердить аккаунт (403 VALIDATION_REQUIRED), страница говорит это и даёт его ссылку; аккаунт
-    сохраняется (вход получен), в ответе — verify_url."""
+    требует подтвердить аккаунт (403 VALIDATION_REQUIRED), браузер сразу переадресуется на страницу подтверждения
+    Google (с 22.11.2026; своей страницы с кнопкой нет); аккаунт сохраняется (вход получен), в ответе — verify_url."""
     _need_google_keys()
     state = secrets.token_urlsafe(16)
     result = {}
@@ -615,7 +615,7 @@ def ag_login(login_hint=None, expect=None):
             http_json(CC_BASE + "/v1internal:retrieveUserQuotaSummary", body,
                       headers={"Authorization": "Bearer " + tok["access_token"], "User-Agent": cc_user_agents()[0]})
         except Exception as e:  # облако недоступно — вход всё равно получен; требует подтверждения — скажем
-            acc["verify_url"], result["learn"] = validation_links(e)
+            acc["verify_url"] = validation_url(e)
         return acc
 
     class H(http.server.BaseHTTPRequestHandler):
@@ -626,14 +626,11 @@ def ag_login(login_hint=None, expect=None):
                 if "code" in q and q.get("state") == state:
                     try:
                         result["acc"] = acc = finish(q["code"], redirect)
-                        if acc.get("verify_url"):
-                            learn = result.get("learn")
-                            page = _login_page(
-                                "warn", T("Google просит подтвердить аккаунт"),
-                                T("Вход в {email} выполнен, но лимиты Gemini недоступны, пока аккаунт не подтверждён "
-                                  "в Google.", email="{email}"), acc["email"],
-                                (T("Подтвердить аккаунт"), acc["verify_url"]),
-                                (T("Зачем это нужно —"), T("справка Google"), learn) if learn else None)
+                        if acc.get("verify_url"):  # сразу на страницу подтверждения Google (владелец, 22.11.2026)
+                            self.send_response(302)
+                            self.send_header("Location", acc["verify_url"])
+                            self.end_headers()
+                            return
                         else:
                             page = _login_page("ok", T("Готово"),
                                                T("Вход в {email} выполнен. Эту вкладку можно закрыть.", email="{email}"),

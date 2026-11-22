@@ -199,7 +199,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.warn = float(p)
         self.persist()
         if self.data:
-            self.render(*self.data)
+            self.render(self.data)
 
     # ------------------------------------------------ загрузка
     def schedule(self):
