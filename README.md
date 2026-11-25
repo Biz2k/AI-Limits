@@ -5,7 +5,7 @@
 A small Windows 11 desktop app that shows how much of your **Claude Code** (Claude subscription), **Codex**
 (ChatGPT subscription) and **Google Antigravity** (Gemini models) usage limits you have spent — for several
 accounts of each service at once. It picks up the accounts your apps are already signed in to by itself and can
-switch the account the Antigravity IDE is signed in to with one click.
+switch the active account in **Claude Code**, **Codex** and the **Antigravity** IDE with one click.
 
 > Unofficial project. Not affiliated with Anthropic, OpenAI or Google. The window is available in English, Russian and
 > Ukrainian (⚙ → Language); the console version is in Russian.
