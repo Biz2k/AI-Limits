@@ -98,15 +98,9 @@ Antigravity переключает одним нажатием.
   `Get-FileHash "AI Limits.exe" -Algorithm SHA256` и сравните результат.
 - Ключей в exe нет. При добавлении Google-аккаунта AI Limits сам находит установленную IDE **Antigravity**,
   извлекает её OAuth client id и secret и сохраняет их зашифрованными в `%APPDATA%\ai-limits\keys.dat`. Если
-  Antigravity не установлена, используется уже сохранённый ключ из `keys.dat` (либо переменные окружения
-  `ANTIGRAVITY_OAUTH_CLIENT_ID` и `ANTIGRAVITY_OAUTH_CLIENT_SECRET`); если нет ни программы, ни ключа —
-  показывается всплывающее предупреждение о необходимости установить нужную программу (Antigravity, Claude Code
-  или Codex):
-
-  ```
-  setx ANTIGRAVITY_OAUTH_CLIENT_ID "<client id>"
-  setx ANTIGRAVITY_OAUTH_CLIENT_SECRET "<client secret>"
-  ```
+  Antigravity не установлена, используется сохранённый ключ из `keys.dat` (или переменные окружения — см.
+  [Установка](#установка)); если нет ни программы, ни ключа — показывается всплывающее предупреждение о
+  необходимости установить нужную программу (Antigravity, Claude Code или Codex).
 
   Карточки Claude Code и Codex (и добавленные аккаунты Claude и ChatGPT) работают и без Google-ключей.
 

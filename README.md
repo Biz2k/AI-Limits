@@ -96,14 +96,8 @@ not needed to run it.
 - The exe contains no keys. When you add a Google account, AI Limits automatically finds the installed
   **Antigravity** IDE, extracts its OAuth client id and secret, and saves them encrypted in
   `%APPDATA%\ai-limits\keys.dat`. If Antigravity is not installed, it uses the saved key from `keys.dat` (or
-  the `ANTIGRAVITY_OAUTH_CLIENT_ID` / `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables); if neither the
-  app nor a key is found, it shows a pop-up asking you to install the required app (Antigravity, Claude Code,
-  or Codex):
-
-  ```
-  setx ANTIGRAVITY_OAUTH_CLIENT_ID "<client id>"
-  setx ANTIGRAVITY_OAUTH_CLIENT_SECRET "<client secret>"
-  ```
+  environment variables — see [Setup](#setup)); if neither the app nor a key is found, it shows a pop-up
+  asking you to install the required app (Antigravity, Claude Code, or Codex).
 
   The Claude Code and Codex cards (and added Claude and ChatGPT accounts) work without Google keys.
 
