@@ -93,15 +93,19 @@ not needed to run it.
   choose **More info → Run anyway**.
 - Each release lists the SHA-256 of the exe. To check your download, run in PowerShell
   `Get-FileHash "AI Limits.exe" -Algorithm SHA256` and compare the result.
-- The exe contains no keys. Before adding a Google account, set the OAuth client id and secret of the Antigravity
-  application (see [Setup](#setup) for where they come from) as environment variables, then start the app again:
+- The exe contains no keys. When you add a Google account, AI Limits automatically finds the installed
+  **Antigravity** IDE, extracts its OAuth client id and secret, and saves them encrypted in
+  `%APPDATA%\ai-limits\keys.dat`. If Antigravity is not installed, it uses the saved key from `keys.dat` (or
+  the `ANTIGRAVITY_OAUTH_CLIENT_ID` / `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables); if neither the
+  app nor a key is found, it shows a pop-up asking you to install the required app (Antigravity, Claude Code,
+  or Codex):
 
   ```
   setx ANTIGRAVITY_OAUTH_CLIENT_ID "<client id>"
   setx ANTIGRAVITY_OAUTH_CLIENT_SECRET "<client secret>"
   ```
 
-  The Claude Code and Codex cards (and added Claude and ChatGPT accounts) work without them.
+  The Claude Code and Codex cards (and added Claude and ChatGPT accounts) work without Google keys.
 
 ## Requirements
 
@@ -124,14 +128,13 @@ For running from source:
    pythonw limits_gui.pyw
    ```
 
-3. Enter the OAuth client id and secret of the Antigravity application with `python limits.py keys`
-   (close the window first, start it again afterwards). They are **not included** in this repository or in the
-   exe. These are the values the Antigravity application itself signs in with; the open-source npm package
-   [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage) contains them in its source code — that is
-   where this project took them from. The app keeps them in
-   `%APPDATA%\ai-limits\keys.dat`, encrypted for your Windows account. Alternatively, set the
-   `ANTIGRAVITY_OAUTH_CLIENT_ID` and `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables, or, when running
-   from source, copy `local_keys.example.py` to `local_keys.py` and fill it in.
+3. OAuth client id and secret of the Antigravity application are **not included** in this repository or in the
+   exe. When you add a Google account, AI Limits automatically reads them from your installed Antigravity IDE
+   and saves them encrypted in `%APPDATA%\ai-limits\keys.dat`. If Antigravity is not installed on that machine,
+   you can enter them manually with `python limits.py keys` (close the window first, start it again afterwards),
+   set the `ANTIGRAVITY_OAUTH_CLIENT_ID` and `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables, or, when
+   running from source, copy `local_keys.example.py` to `local_keys.py` and fill it in (these values are also
+   available in the open-source npm package [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage)).
 4. Add accounts if you need more than the ones your apps are signed in to: ⚙ → "Add account" → Claude,
    ChatGPT or Google.
 

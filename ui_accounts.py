@@ -206,32 +206,40 @@ class AccountsMixin:
         self.close_menu()
         self.add_account(kind, relogin={"ident": ident, "email": email, "prof": prof})
 
+    def _warn_missing_program(self, kind, pos=None):
+        """Всплывающее предупреждение: для добавления аккаунта нужно установить соответствующую программу."""
+        self.notice(
+            T("Установите {product}", product=A.PRODUCT[kind]),
+            T("Чтобы добавить аккаунт {service}, установите {product} на этот компьютер.",
+              service=GROUP[kind], product=A.PRODUCT[kind]),
+            pos=pos,
+        )
+
     def add_account(self, kind="google", relogin=None):
         """Добавить аккаунт: Google — вход в браузере; Claude и ChatGPT — вход самой программы в окне консоли
         в отдельную папку профиля. Совпал с аккаунтом программы — плитка программы получает его имя.
         relogin — повторный вход в уже добавленный аккаунт (↻): вход заменяется, только если это тот же аккаунт."""
         if getattr(self, "adding", False):
             self.cancel_add()  # предыдущий незавершённый вход — отменить, начать новый
+        pos = self.root.winfo_pointerxy()
         self._add_token = token = getattr(self, "_add_token", 0) + 1
         p = None
         if kind == "google":
-            self.say(T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]) if relogin
-                     else T("Войдите в Google в открывшемся браузере…"), GOOGLE)
-        elif relogin:
-            try:
-                p = A.start_login(kind)
-            except Exception as e:
-                self.notify(str(e), RED, hold=20)
-                return
-            self.say(T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]), ACCENT[kind])
+            self.say(T("Поиск ключей {product}…", product=A.PRODUCT[kind]), GOOGLE)
         else:
+            if not L.sync_program_keys(kind):
+                self._warn_missing_program(kind, pos)
+                return
             try:
                 p = A.start_login(kind)
             except Exception as e:
                 self.notify(str(e), RED, hold=20)
                 return
-            self.say(T("Войдите в аккаунт Claude в открывшемся браузере…") if kind == "claude"
-                     else T("Войдите в аккаунт ChatGPT в открывшемся браузере…"), ACCENT[kind])
+            if relogin:
+                self.say(T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]), ACCENT[kind])
+            else:
+                self.say(T("Войдите в аккаунт Claude в открывшемся браузере…") if kind == "claude"
+                         else T("Войдите в аккаунт ChatGPT в открывшемся браузере…"), ACCENT[kind])
         self.adding, self._add_profile = True, p
         self._show_cancel(True)
 
@@ -239,6 +247,19 @@ class AccountsMixin:
             verify = None
             try:
                 if kind == "google":
+                    if not L.sync_program_keys("google"):
+                        def missing():
+                            if token != self._add_token:
+                                return
+                            self.adding = False
+                            self._show_cancel(False)
+                            self.set_status_updated()
+                            self._warn_missing_program("google", pos)
+                        self.root.after(0, missing)
+                        return
+                    self.root.after(0, lambda: token == self._add_token and self.say(
+                        T("Войдите в {email} в открывшемся браузере…", email=relogin["email"]) if relogin
+                        else T("Войдите в Google в открывшемся браузере…"), GOOGLE))
                     acc = (L.ag_login(login_hint=relogin["email"], expect=relogin["email"]) if relogin
                            else L.ag_login())
                     verify = acc.pop("verify_url", None)  # вход получен, но Google просит подтвердить аккаунт

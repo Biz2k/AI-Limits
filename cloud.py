@@ -1,9 +1,11 @@
 """Запросы к Anthropic и Google: OAuth-ключи, аккаунты, лимиты Claude Code и Antigravity из облака."""
 import datetime as dt
+import glob
 import html
 import http.server
 import json
 import os
+import re
 import secrets
 import sys
 import threading
@@ -33,6 +35,28 @@ G_CLIENT_ID = G_CLIENT_SECRET = ""
 G_KEYS_SOURCE = None  # откуда взяты ключи: "переменные окружения" | "зашифрованный файл" | "local_keys.py" | None
 
 
+def _read_keys_dict():
+    """Читает словарь из зашифрованного keys.dat (или {} при ошибке)."""
+    try:
+        with open(storage.KEYS_FILE, "rb") as f:
+            d = json.loads(storage.unprotect_bytes(f.read()).decode("utf-8"))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_keys_dict(data):
+    """Атомарно сохраняет словарь data в зашифрованный keys.dat (DPAPI)."""
+    os.makedirs(storage.APPDIR, exist_ok=True)
+    raw = json.dumps(data).encode("utf-8")
+    tmp = storage.KEYS_FILE + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(storage.protect_bytes(raw))
+    os.replace(tmp, storage.KEYS_FILE)
+    if os.name != "nt":
+        os.chmod(storage.KEYS_FILE, 0o600)
+
+
 def load_google_keys():
     """Читает ключи OAuth (порядок — см. выше) в G_CLIENT_ID / G_CLIENT_SECRET; возвращает источник или None."""
     global G_CLIENT_ID, G_CLIENT_SECRET, G_KEYS_SOURCE
@@ -41,13 +65,9 @@ def load_google_keys():
     if all(env):
         found = (env[0], env[1], "переменные окружения")
     if not found[2]:
-        try:
-            with open(storage.KEYS_FILE, "rb") as f:
-                d = json.loads(storage.unprotect_bytes(f.read()).decode("utf-8"))
-            if d.get("client_id") and d.get("client_secret"):
-                found = (d["client_id"], d["client_secret"], "зашифрованный файл")
-        except Exception:
-            pass
+        d = _read_keys_dict()
+        if d.get("client_id") and d.get("client_secret"):
+            found = (d["client_id"], d["client_secret"], "зашифрованный файл")
     if not found[2] and not getattr(sys, "frozen", False):
         try:  # имя модуля строкой, чтобы PyInstaller не вшил файл с ключами в exe
             import importlib
@@ -65,15 +85,147 @@ def set_google_keys(client_id, client_secret):
     client_id, client_secret = (client_id or "").strip(), (client_secret or "").strip()
     if not client_id or not client_secret:
         raise ValueError("нужны оба значения: id и secret")
-    os.makedirs(storage.APPDIR, exist_ok=True)
-    raw = json.dumps({"client_id": client_id, "client_secret": client_secret}).encode("utf-8")
-    tmp = storage.KEYS_FILE + ".tmp"
-    with open(tmp, "wb") as f:
-        f.write(storage.protect_bytes(raw))
-    os.replace(tmp, storage.KEYS_FILE)
-    if os.name != "nt":
-        os.chmod(storage.KEYS_FILE, 0o600)
+    d = _read_keys_dict()
+    d["client_id"], d["client_secret"] = client_id, client_secret
+    _write_keys_dict(d)
     return load_google_keys()
+
+
+_G_CID_RE = re.compile(rb"[0-9]{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com")
+_G_SEC_RE = re.compile(rb"GOCSPX-[A-Za-z0-9_-]{28}")
+_ASAR_CID_RE = re.compile(
+    rb"clientId\s*:\s*['\"]([0-9]{10,}-[a-z0-9]{20,}\.apps\.googleusercontent\.com)['\"][^}]{0,240}"
+    rb"(?:LS_GOOGLE_SCOPES|cloud-platform)"
+)
+
+
+def _scan_file_regex(path, pattern, group=0, chunk_size=4 * 1024 * 1024, overlap=512):
+    """Ищет уникальные ASCII-совпадения pattern в файле path по частям (не загружая целиком в память)."""
+    found, seen, tail = [], set(), b""
+    try:
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                buf = tail + chunk
+                for m in pattern.finditer(buf):
+                    val = m.group(group).decode("ascii", errors="ignore")
+                    if val and val not in seen:
+                        seen.add(val)
+                        found.append(val)
+                tail = buf[-overlap:] if len(buf) > overlap else buf
+    except OSError:
+        pass
+    return found
+
+
+def _antigravity_resources_dir():
+    """Папка resources установленной IDE Antigravity или None."""
+    exe = ide_local.find_ide_executable() or ide_local.ide_installed()
+    if not exe:
+        return None
+    d = os.path.dirname(exe)
+    for cand in (os.path.join(d, "resources"), os.path.join(os.path.dirname(d), "resources")):
+        if os.path.isdir(cand):
+            return cand
+    return None
+
+
+def _probe_google_oauth_pair(client_id, client_secret):
+    """Проверяет, соответствует ли client_secret данному client_id (Google отвечает invalid_grant вместо invalid_client)."""
+    body = urllib.parse.urlencode({
+        "client_id": client_id, "client_secret": client_secret,
+        "refresh_token": "probe", "grant_type": "refresh_token",
+    }).encode()
+    req = urllib.request.Request(G_TOKEN_URL, data=body,
+                                 headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            return True
+    except urllib.error.HTTPError as e:
+        try:
+            err = json.loads(e.read().decode("utf-8", errors="replace")).get("error")
+        except Exception:
+            err = None
+        return err == "invalid_grant"
+    except Exception:
+        return None
+
+
+def extract_antigravity_keys(res_dir=None):
+    """Извлекает пару (client_id, client_secret) из установленной IDE Antigravity или возвращает None."""
+    res_dir = res_dir or _antigravity_resources_dir()
+    if not res_dir or not os.path.isdir(res_dir):
+        return None
+    cids = []
+    asar = os.path.join(res_dir, "app.asar")
+    if os.path.isfile(asar):
+        cids = _scan_file_regex(asar, _ASAR_CID_RE, group=1)
+        for c in _scan_file_regex(asar, _G_CID_RE):
+            if c not in cids:
+                cids.append(c)
+    ls_bins = []
+    for pat in (os.path.join(res_dir, "bin", "language_server*"),
+                os.path.join(res_dir, "app", "extensions", "*", "bin", "language_server*")):
+        for p in sorted(glob.glob(pat)):
+            if os.path.isfile(p) and p not in ls_bins:
+                ls_bins.append(p)
+    secs = []
+    for p in ls_bins:
+        for s in _scan_file_regex(p, _G_SEC_RE):
+            if s not in secs:
+                secs.append(s)
+        if not cids:
+            for c in _scan_file_regex(p, _G_CID_RE):
+                if c not in cids:
+                    cids.append(c)
+    if not cids or not secs:
+        return None
+    # Если текущие ключи из keys.dat совпадают с найденными в установленной IDE — сеть не трогаем
+    cur = _read_keys_dict()
+    cur_cid, cur_sec = cur.get("client_id") or G_CLIENT_ID, cur.get("client_secret") or G_CLIENT_SECRET
+    if cur_cid and cur_sec and cur_cid == cids[0] and cur_sec in secs:
+        return cur_cid, cur_sec
+    if len(cids) == 1 and len(secs) == 1:
+        return cids[0], secs[0]
+    for cid in cids:
+        for sec in secs:
+            ok = _probe_google_oauth_pair(cid, sec)
+            if ok is True:
+                return cid, sec
+            if ok is None:
+                return None  # нет связи — не перебираем впустую
+    return None
+
+
+def sync_program_keys(kind):
+    """Перед добавлением аккаунта ищет установленную программу (Claude Code, Codex, Antigravity)
+    и обновляет ключи в keys.dat. Если программы нет — использует текущий ключ из keys.dat (для Google).
+    Возвращает True, если можно начинать вход, иначе False (нужно установить программу)."""
+    if kind == "google":
+        pair = extract_antigravity_keys()
+        if pair:
+            cur = _read_keys_dict()
+            if cur.get("client_id") != pair[0] or cur.get("client_secret") != pair[1]:
+                set_google_keys(pair[0], pair[1])
+            else:
+                load_google_keys()
+            return True
+        load_google_keys()
+        return bool(G_CLIENT_ID and G_CLIENT_SECRET)
+    cli = accounts.find_cli(kind)
+    if not cli:
+        return False
+    if kind == "claude":
+        try:
+            d = _read_keys_dict()
+            if d.get("claude_client_id") != CLAUDE_CLIENT_ID:
+                d["claude_client_id"] = CLAUDE_CLIENT_ID
+                _write_keys_dict(d)
+        except Exception:
+            pass
+    return True
 
 
 load_google_keys()
@@ -379,6 +531,8 @@ def protect_stored_secrets():
 
 
 def g_access_token(acc):
+    if not (G_CLIENT_ID and G_CLIENT_SECRET):
+        sync_program_keys("google")
     _need_google_keys()
     if not acc.get("refresh_token"):
         raise RuntimeError(T("токен аккаунта не расшифрован (данные с другого компьютера?) — добавьте аккаунт заново"))
@@ -603,6 +757,8 @@ def ag_login(login_hint=None, expect=None):
     обмена кода на токен, получения email (expect — нужный email: другой — отказ) и проверки облака: если Google
     требует подтвердить аккаунт (403 VALIDATION_REQUIRED), браузер сразу переадресуется на страницу подтверждения
     Google (с 22.11.2026; своей страницы с кнопкой нет); аккаунт сохраняется (вход получен), в ответе — verify_url."""
+    if not (G_CLIENT_ID and G_CLIENT_SECRET):
+        sync_program_keys("google")
     _need_google_keys()
     state = secrets.token_urlsafe(16)
     result = {}

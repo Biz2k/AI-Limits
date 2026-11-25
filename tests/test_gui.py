@@ -1015,6 +1015,32 @@ def main():
     STATE["codex"] = False
     step("удаление аккаунта: профиль, папка и имя; аккаунт программы удалить нельзя")
 
+    # предупреждение при отсутствии программы и ключа (Google / Claude / ChatGPT): под курсором, в пределах правой грани окна
+    real_sync = L.sync_program_keys
+    L.sync_program_keys = lambda k: False
+    try:
+        px, py = root.winfo_rootx() + root.winfo_width() - 10, root.winfo_rooty() + 80
+        root.winfo_pointerxy = lambda: (px, py)
+        for kind, expected in (("claude", "Установите Claude Code"),
+                               ("chatgpt", "Установите Codex"),
+                               ("google", "Установите Antigravity")):
+            app.add_account(kind)
+            yield wait(5, lambda: app.confirm_win is not None, f"не появилось предупреждение для {kind}")
+            nw = app.confirm_win
+            joined = " ".join(texts(nw))
+            assert expected in joined, joined
+            nx, ny, nw_w = nw.winfo_rootx(), nw.winfo_rooty(), nw.winfo_width()
+            assert ny > py, (ny, py)
+            assert nx + nw_w <= root.winfo_rootx() + root.winfo_width(), (nx, nw_w, root.winfo_rootx(), root.winfo_width())
+            nw.event_generate("<Escape>")
+            yield wait()
+            assert app.confirm_win is None
+    finally:
+        if "winfo_pointerxy" in root.__dict__:
+            del root.winfo_pointerxy
+        L.sync_program_keys = real_sync
+    step("предупреждение об установке программы: появляется под курсором в пределах правой грани окна")
+
     print("Все проверки окна пройдены.")
     app.quit_app()
 

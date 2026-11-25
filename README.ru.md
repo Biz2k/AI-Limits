@@ -96,15 +96,19 @@ Antigravity переключает одним нажатием.
   компьютер»: выберите **Подробнее → Выполнить в любом случае**.
 - У каждого выпуска указана сумма SHA-256 файла. Чтобы проверить загрузку, выполните в PowerShell
   `Get-FileHash "AI Limits.exe" -Algorithm SHA256` и сравните результат.
-- Ключей в exe нет. Перед добавлением Google-аккаунта задайте id и secret OAuth-клиента приложения Antigravity
-  (откуда их взять — в разделе [Установка](#установка)) переменными окружения и запустите программу заново:
+- Ключей в exe нет. При добавлении Google-аккаунта AI Limits сам находит установленную IDE **Antigravity**,
+  извлекает её OAuth client id и secret и сохраняет их зашифрованными в `%APPDATA%\ai-limits\keys.dat`. Если
+  Antigravity не установлена, используется уже сохранённый ключ из `keys.dat` (либо переменные окружения
+  `ANTIGRAVITY_OAUTH_CLIENT_ID` и `ANTIGRAVITY_OAUTH_CLIENT_SECRET`); если нет ни программы, ни ключа —
+  показывается всплывающее предупреждение о необходимости установить нужную программу (Antigravity, Claude Code
+  или Codex):
 
   ```
   setx ANTIGRAVITY_OAUTH_CLIENT_ID "<client id>"
   setx ANTIGRAVITY_OAUTH_CLIENT_SECRET "<client secret>"
   ```
 
-  Карточки Claude Code и Codex (и добавленные аккаунты Claude и ChatGPT) работают и без них.
+  Карточки Claude Code и Codex (и добавленные аккаунты Claude и ChatGPT) работают и без Google-ключей.
 
 ## Что нужно
 
@@ -127,14 +131,13 @@ Antigravity переключает одним нажатием.
    pythonw limits_gui.pyw
    ```
 
-3. Введите id и secret OAuth-клиента приложения Antigravity командой `python limits.py keys`
-   (окно перед этим закройте, после — запустите снова). Ни в репозитории, ни в exe их **нет**. Это те значения, с которыми выполняет
-   вход само приложение Antigravity; они есть в исходном коде открытого npm-пакета
-   [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage) — оттуда их взял и этот проект.
-   Программа хранит их в
-   `%APPDATA%\ai-limits\keys.dat` зашифрованными под вашей учётной записью Windows. Вместо этого можно задать
-   переменные окружения `ANTIGRAVITY_OAUTH_CLIENT_ID` и `ANTIGRAVITY_OAUTH_CLIENT_SECRET` либо, при запуске из
-   исходников, скопировать `local_keys.example.py` в `local_keys.py` и заполнить его.
+3. Ни в репозитории, ни в exe OAuth-ключей Antigravity **нет**. При добавлении Google-аккаунта программа
+   автоматически берёт их из установленной IDE Antigravity и сохраняет в `%APPDATA%\ai-limits\keys.dat`,
+   зашифрованными под вашей учётной записью Windows. Если Antigravity не установлена, их можно задать вручную
+   командой `python limits.py keys` (окно перед этим закройте, после — запустите снова), через переменные
+   окружения `ANTIGRAVITY_OAUTH_CLIENT_ID` и `ANTIGRAVITY_OAUTH_CLIENT_SECRET` либо, при запуске из исходников,
+   скопировать `local_keys.example.py` в `local_keys.py` и заполнить его (эти значения также есть в открытом
+   npm-пакете [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage)).
 4. Если нужны аккаунты кроме тех, под которыми вошли ваши программы: ⚙ → «Добавить аккаунт» → Claude,
    ChatGPT или Google.
 

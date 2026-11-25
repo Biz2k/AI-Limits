@@ -133,7 +133,43 @@ def test_keys():
     del os.environ["ANTIGRAVITY_OAUTH_CLIENT_ID"], os.environ["ANTIGRAVITY_OAUTH_CLIENT_SECRET"]
     assert cloud.load_google_keys() == "зашифрованный файл"
     assert limits.G_KEYS_SOURCE == "зашифрованный файл"  # через limits видно текущее значение
-    step("OAuth-ключи: keys.dat зашифрован, переменные окружения важнее файла")
+    # автопоиск ключей из установленной IDE Antigravity и запасной вариант из keys.dat
+    fake_res = os.path.join(TMP, "fake_ag", "resources")
+    os.makedirs(os.path.join(fake_res, "bin"), exist_ok=True)
+    cid1 = "1" * 12 + "-" + "a" * 20 + "1" * 12 + ".apps.googleusercontent.com"
+    cid2 = "2" * 12 + "-" + "b" * 20 + "2" * 12 + ".apps.googleusercontent.com"
+    sec1 = "GOCSPX-" + "1" * 28
+    sec2 = "GOCSPX-" + "2" * 28
+    with open(os.path.join(fake_res, "app.asar"), "wb") as f:
+        f.write(f"clientId: '{cid1}', scopes: [...LS_GOOGLE_SCOPES, 'https://www.googleapis.com/auth/cloud-platform'] "
+                f"clientId: '{cid2}'".encode())
+    with open(os.path.join(fake_res, "bin", "language_server.exe"), "wb") as f:
+        f.write(f"xxx{sec1}yyy{sec2}zzz".encode())
+    real_res, real_probe, real_cli = cloud._antigravity_resources_dir, cloud._probe_google_oauth_pair, accounts.find_cli
+    try:
+        cloud._antigravity_resources_dir = lambda: fake_res
+        cloud._probe_google_oauth_pair = lambda c, s: (c == cid1 and s == sec2)
+        os.remove(storage.KEYS_FILE)
+        cloud.G_CLIENT_ID = cloud.G_CLIENT_SECRET = ""
+        assert cloud.sync_program_keys("google") is True
+        assert cloud.G_CLIENT_ID == cid1 and cloud.G_CLIENT_SECRET == sec2
+        # программы нет — берём ключ из keys.dat
+        cloud._antigravity_resources_dir = lambda: None
+        cloud.G_CLIENT_ID = cloud.G_CLIENT_SECRET = ""
+        assert cloud.sync_program_keys("google") is True and cloud.G_CLIENT_ID == cid1
+        # нет ни программы, ни ключа в keys.dat — False
+        os.remove(storage.KEYS_FILE)
+        cloud.G_CLIENT_ID = cloud.G_CLIENT_SECRET = ""
+        assert cloud.sync_program_keys("google") is False
+        # Claude / Codex: есть программа -> True, нет -> False
+        accounts.find_cli = lambda k: None
+        assert cloud.sync_program_keys("claude") is False and cloud.sync_program_keys("chatgpt") is False
+        accounts.find_cli = lambda k: f"C:\\fake\\{k}.exe"
+        assert cloud.sync_program_keys("claude") is True and cloud.sync_program_keys("chatgpt") is True
+    finally:
+        cloud._antigravity_resources_dir, cloud._probe_google_oauth_pair, accounts.find_cli = real_res, real_probe, real_cli
+        cloud.set_google_keys("fake-id.apps.example", "GOCSPX-fake-secret")
+    step("OAuth-ключи: keys.dat зашифрован, переменные окружения важнее файла, автопоиск из IDE и запасной keys.dat")
 
 
 # ------------------------------------------------------------------ заголовок версии IDE

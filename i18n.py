@@ -454,4 +454,10 @@ TEXTS = {
     "Вход не выполнен за 5 минут — войдите в самой IDE (журнал: {log})":
         ("Sign-in was not completed in 5 minutes — sign in in the IDE itself (log: {log})",
          "Вхід не виконано за 5 хвилин — увійдіть у самій IDE (журнал: {log})"),
+    "Понятно": ("OK", "Зрозуміло"),
+    "Поиск ключей {product}…": ("Looking for {product} keys…", "Пошук ключів {product}…"),
+    "Установите {product}": ("Install {product}", "Установіть {product}"),
+    "Чтобы добавить аккаунт {service}, установите {product} на этот компьютер.":
+        ("To add a {service} account, install {product} on this computer.",
+         "Щоб додати акаунт {service}, установіть {product} на цей комп'ютер."),
 }

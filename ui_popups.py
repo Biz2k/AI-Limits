@@ -109,6 +109,45 @@ class PopupsMixin:
         p.focus_force()
         p.bind("<FocusOut>", lambda e: self.root.after(120, self._confirm_focus_check))
 
+    def notice(self, title, text, pos=None):
+        """Своё тёмное окно-предупреждение в стиле AI Limits: появляется под курсором мыши,
+        не выходя за правую грань основного окна программы."""
+        self.close_confirm()
+        px, py = pos if pos is not None else self.root.winfo_pointerxy()
+        self.close_menu()
+        p = tk.Toplevel(self.root)
+        p.overrideredirect(True)
+        p.attributes("-topmost", True)
+        p.configure(bg=LINE)
+        self.confirm_win = p
+        r = self.root
+        rw = max(r.winfo_width(), 220)
+        wrap = min(round(r.winfo_fpixels("1i") / 96 * 250), max(160, rw - 48))
+        box = tk.Frame(p, bg=CARD, padx=16, pady=14)
+        box.pack(padx=1, pady=1)
+        tk.Label(box, text=title, bg=CARD, fg=FG, font=(FONT, 11, "bold"), anchor="w", justify="left",
+                 wraplength=wrap).pack(fill="x")
+        tk.Label(box, text=text, bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w", justify="left",
+                 wraplength=wrap).pack(fill="x", pady=(8, 14))
+        btns = tk.Frame(box, bg=CARD)
+        btns.pack(fill="x")
+        FlatButton(btns, T("Понятно"), self.close_confirm, bg=BLUE, fg="white", hover="#7aa2f5").pack(side="right")
+
+        p.update_idletasks()
+        w, h = p.winfo_reqwidth(), p.winfo_reqheight()
+        left, top, right, bottom = self._work_area(px, py)
+        r_right = r.winfo_rootx() + r.winfo_width()
+        max_x = min(r_right, right) - w - 8
+        x = max(left + 8, min(px - w // 2, max_x))
+        y = py + POINTER_GAP
+        if y + h > bottom - 8:
+            y = max(top + 8, py - h - POINTER_GAP)
+        p.geometry(f"+{x}+{y}")
+        p.bind("<Escape>", self.close_confirm)
+        p.bind("<Return>", self.close_confirm)
+        p.focus_force()
+        p.bind("<FocusOut>", lambda e: self.root.after(120, self._confirm_focus_check))
+
     def _confirm_focus_check(self):
         w = getattr(self, "confirm_win", None)
         if not w:
