@@ -23,8 +23,10 @@ switch the active account in **Claude Code**, **Codex** and the **Antigravity** 
   account its app is signed in to right now.
 - ⚙ → **Add account**: Claude, ChatGPT or Google. Claude and ChatGPT accounts sign in through Claude Code
   (`claude auth login`) and Codex (`codex login`) into a separate profile folder of AI Limits, so your own
-  Claude Code and Codex sign-ins stay untouched; Google signs in in the browser. If the new account is the one an
-  app is signed in to, that app's card simply takes its name.
+  Claude Code and Codex sign-ins stay untouched; Google signs in in the browser (OAuth keys are picked up
+  automatically from the installed Antigravity IDE). If the required app is not installed (and no saved Google
+  key is present), a pop-up prompts you to install it. If the new account is the one an app is signed in to,
+  that app's card simply takes its name.
 - Every account has a name of your choice, unique within the app (by default the part of the email before «@»; if
   taken, with the service in front: "Codex alex"). Rename it by double-clicking the name on its card or in
   ⚙ → **Manage accounts**, which lists the accounts by service with the email below the name and can delete them; ↻ signs in to an added account again to refresh its sign-in (only the same account is accepted).
@@ -39,6 +41,8 @@ switch the active account in **Claude Code**, **Codex** and the **Antigravity** 
 - The account with the most weekly limit left, of any service, is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace.
+- Clear status badges: yellow **OFFLINE** (keeping the last known values dimmed) when the network is down, and
+  red **LOGOUT** when Google requires account verification.
 
 **Antigravity IDE account**
 - **"→ to IDE" button**: signs the Antigravity IDE in to another saved account without the Google sign-in page
@@ -61,7 +65,8 @@ switch the active account in **Claude Code**, **Codex** and the **Antigravity** 
 **Window**
 - Cards can be collapsed (a collapsed card shows how much of its weekly limit is left), reordered by dragging the
   colored strip on their left (the other cards slide aside), and laid out in two columns (⚙ → Cards in two columns).
-- Auto refresh (1 / 5 / 15 min), always-on-top. Cards update in place without flicker.
+- Remembers window size and position; shows a thin scrollbar in the app's style when the cards do not fit.
+- Auto refresh (1 / 5 / 15 min), always-on-top. Cards and the ⚙ settings menu update in place without flicker.
 - Tray icon with a mini window on hover (same card order), a dark context menu, minimize/close to tray, start with
   Windows. Clicking the icon brings the window to the front, or hides it to the tray if it is already in focus.
 - Pop-up warning above the clock when a limit crosses the threshold you chose (70–95 %, or off). Pop-up forecast
@@ -107,10 +112,11 @@ For running from source:
 
 - Windows 11
 - Python 3.13 (the Microsoft Store build works)
-- Claude Code installed and signed in (`~/.claude/.credentials.json`) — for the Claude card
-- Codex signed in with a ChatGPT account (`~/.codex/auth.json`) — optional, for the Codex card; Codex
-  (`codex.exe`) or Claude Code (`claude.exe`) is also needed to add more ChatGPT or Claude accounts
-- Antigravity IDE — optional, needed for IDE data and account switching
+- Claude Code installed and signed in (`~/.claude/.credentials.json`) — optional, for the Claude card and adding
+  or switching Claude accounts
+- Codex signed in with a ChatGPT account (`~/.codex/auth.json`) — optional, for the Codex card and adding or
+  switching ChatGPT accounts
+- Antigravity IDE — optional, used for live IDE data, account switching, and automatic Google OAuth key discovery
 - PyInstaller 6.x — only if you want to build the exe
 
 ## Setup
@@ -171,7 +177,7 @@ Everything lives in `%APPDATA%\ai-limits\`:
 | --- | --- |
 | `accounts.json` | Google refresh tokens of the accounts you added (encrypted) |
 | `profiles.json`, `profiles\` | Claude and ChatGPT accounts you added: one folder each, the sign-in in `creds.dat` (encrypted) |
-| `keys.dat` | Antigravity OAuth client id and secret (encrypted) |
+| `keys.dat` | OAuth keys (Antigravity client id and secret, filled automatically from the installed IDE; encrypted) |
 | `cache.json` | last seen limit values (kept until each limit resets) |
 | `gui.json` | window settings, account names |
 | `history.csv` | limit values over time, kept for 60 days (no tokens) |
@@ -206,7 +212,8 @@ This is not an official mechanism. It may stop working after an IDE update, and 
   They can change or be blocked at any time, and using them may be against the services' terms.
 - To get both Gemini limits for accounts that are not signed in to the IDE, requests to Google identify the app
   as a recent version of the Antigravity IDE.
-- It reads and writes credentials of the Antigravity IDE on your machine.
+- It reads and writes credentials of the Antigravity IDE, Codex, and Claude Code on your machine (when switching
+  accounts, with automatic backups beforehand).
 - No warranty of any kind; see the license.
 
 ## License
