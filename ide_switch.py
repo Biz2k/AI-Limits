@@ -222,6 +222,9 @@ class IdeSwitchUnverified(RuntimeError):
     """Токен записан и IDE запущена, но её локальный сервер так и не ответил — проверить аккаунт не удалось."""
 
 
+NO_LOGIN_TIMEOUT = 25  # с: если сервер IDE устойчиво отвечает «входа нет», откатываемся не дожидаясь всех 90 с
+
+
 def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False):
     r"""Смена аккаунта IDE Antigravity на target_email без окна Google:
     1. Находит refresh_token выбранного аккаунта в accounts.json и получает свежий access_token
@@ -321,6 +324,8 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         deadline = started + timeout
         last_detected = None
         state = None  # что видно в IDE: None — сервер не найден, "нет входа" — сервер отвечает без аккаунта
+        no_login_since = None
+        early_rollback = False
         seen_line, seen_at = None, 0
         while time.time() < deadline:
             time.sleep(1)
@@ -341,6 +346,16 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
                                             "проверьте аккаунт в самой IDE"))
             cur = next((us["email"] for _, us in servers if us and us.get("email")), None)
             state = cur or ("нет входа" if servers else None)
+            if state == "нет входа":
+                if no_login_since is None:
+                    no_login_since = time.time()
+                elif time.time() - no_login_since >= min(NO_LOGIN_TIMEOUT, timeout):
+                    ide_local._ide_log(f"Сервер IDE устойчиво отвечает «входа нет» "
+                                       f"{int(time.time() - no_login_since)} с — досрочный откат")
+                    early_rollback = True
+                    break
+            else:
+                no_login_since = None
             if not cur:
                 continue
             if cur.lower() == acc["email"].lower():
@@ -357,7 +372,8 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         if last_detected:
             raise RuntimeError(T("в IDE обнаружен аккаунт {found}, а не {email}", found=last_detected, email=acc["email"]))
         if state == "нет входа":
-            raise RuntimeError(T("IDE не вошла в аккаунт за {timeout} с", timeout=timeout))
+            waited = max(1, int(round(time.time() - started))) if early_rollback else timeout
+            raise RuntimeError(T("IDE не вошла в аккаунт за {timeout} с", timeout=waited))
         raise IdeSwitchUnverified(T("IDE не ответила за {timeout} с — проверьте аккаунт в самой IDE", timeout=timeout))
     except IdeSwitchUnverified as e:
         ide_local._ide_log("Проверка не удалась, отката нет:", str(e))

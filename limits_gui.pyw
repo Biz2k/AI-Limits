@@ -98,12 +98,17 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         hdr = tk.Frame(root, bg=BG)
         hdr.pack(fill="x", padx=20, pady=(18, 6))
         tk.Label(hdr, text="AI Limits", bg=BG, fg=FG, font=(FONT_D, 18, "bold")).pack(side="left")
-        # справа налево: Обновить, ⚙  → на экране: ⚙, Обновить
+        # справа налево: Обновить, ⚙, [↑ версия]  → на экране: [↑ версия], ⚙, Обновить
         self.refresh_btn = FlatButton(hdr, T("⟳  Обновить"), self.refresh)
         self.refresh_btn.pack(side="right")
         self.menu_btn = FlatButton(hdr, "⚙", self.open_menu)
         self.menu_btn.pack(side="right", padx=(0, 6))
         self.menu_tip = Tooltip(self.menu_btn, T("Настройки"))
+        self.update_btn = FlatButton(hdr, "↑", self.open_update_popup, fg=GREEN)
+        self.update_tip = Tooltip(self.update_btn, T("Проверить обновления"))
+        self._update_info = None
+        self._update_checking = False
+        self._update_downloading = False
         # строка под заголовком: слева «Обновлено ЧЧ:ММ» (и сообщения), справа «макс. email → 100%»
         self.status_row = tk.Frame(root, bg=BG)
         self.status_row.pack(fill="x", padx=20)
@@ -134,6 +139,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             self._tray_when_ready()  # с этой галочкой иконка в трее есть всегда
         self.render_placeholder(T("Загрузка…"))
         self.refresh()
+        self.root.after(4000, self.maybe_check_updates)
 
     def _tray_when_ready(self):
         """Показать иконку в трее, как только поток трея создал своё окно."""
@@ -250,6 +256,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
     def on_close(self):
         """Кнопка ✕ окна: в трей (если включено в настройках) или выход."""
         self.close_menu()
+        self.close_update_popup()
         if self.s.get("close_to_tray") and getattr(self, "tray", None):
             self.persist()
             self.to_tray()

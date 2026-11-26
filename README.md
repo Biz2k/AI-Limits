@@ -75,7 +75,7 @@ window.
 
 **Other**
 - Console version with plain-text and JSON output.
-- Version shown in the settings menu and in the exe properties; unhandled errors are written to a log file.
+- Version shown in the settings menu and in the exe properties; checks GitHub Releases once a day (or via ⚙ → Check for updates), shows an update badge in the window header, and can download, verify SHA-256, and update the exe automatically. Unhandled errors are written to a log file.
 - Tokens and keys are stored encrypted (Windows DPAPI).
 - No third-party packages: Python standard library only (tkinter + ctypes).
 

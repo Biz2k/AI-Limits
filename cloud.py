@@ -822,6 +822,7 @@ def ag_login(login_hint=None, expect=None):
             pass
 
     srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    srv.timeout = 1.0
     redirect = f"http://127.0.0.1:{srv.server_port}/callback"
     params = {"client_id": G_CLIENT_ID, "redirect_uri": redirect, "response_type": "code",
               "scope": G_SCOPES, "access_type": "offline", "prompt": "consent select_account",
@@ -832,10 +833,21 @@ def ag_login(login_hint=None, expect=None):
     print("Открываю браузер для входа в Google. Если не открылся — откройте ссылку вручную:\n")
     print(url + "\n")
     webbrowser.open(url)
-    th = threading.Thread(target=lambda: [srv.handle_request() for _ in range(20) if not result], daemon=True)
+    done = threading.Event()
+
+    def serve():
+        while not result and not done.is_set():
+            try:
+                srv.handle_request()
+            except (OSError, ValueError):
+                break
+
+    th = threading.Thread(target=serve, daemon=True)
     th.start()
     th.join(timeout=300)
+    done.set()
     srv.server_close()
+    th.join(timeout=2)
     if "acc" in result:
         return result["acc"]
     raise RuntimeError(result.get("fail") or T("вход не завершён: {reason}", reason=T("таймаут")))

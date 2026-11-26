@@ -69,6 +69,13 @@ L.protect_stored_secrets = lambda: 0
 # два часа назад у аккаунта a@ было 15 % недельного лимита, сейчас 55 %: 40 % за день -> остатка хватит на 27 часов
 history.record(None, [("a@example.com", {"models": rows(15.0, 1.0, RESET)})], now=time.time() - 7200)
 
+import updater  # noqa: E402
+updater.check_latest = lambda timeout=12: {
+    "current": L.__version__, "latest": L.__version__, "tag": f"v{L.__version__}",
+    "available": False, "notes": "Latest test release", "url": updater.RELEASES_URL,
+    "asset_url": None, "asset_name": None, "sha256": None, "checked_at": time.time(),
+}
+
 root = tk.Tk()
 app = G.App(root)
 
@@ -1085,6 +1092,43 @@ def main():
         for k in ("ag1@example.com", "ag2@example.com", "ag3@example.com"):
             app.names().pop(k, None)
     step("автосохранение обнаруженных аккаунтов: дефолтные имена Antigravity, Antigravity1, Antigravity2")
+
+    # проверка обновлений с GitHub: значок в шапке при новой версии, окно статуса с версией и заметками
+    real_upd = updater.check_latest
+    updater.check_latest = lambda timeout=12: {
+        "current": L.__version__, "latest": "9.9.9", "tag": "v9.9.9",
+        "available": True, "notes": "• Новая функция\n• Исправление ошибок",
+        "url": "https://github.com/Biz2k/AI-Limits/releases/tag/v9.9.9",
+        "asset_url": "https://example.com/AI.Limits.exe", "asset_name": "AI.Limits.exe",
+        "sha256": "a" * 64, "checked_at": time.time(),
+    }
+    try:
+        app.check_updates(silent=True)
+        yield wait(3, lambda: app.update_btn.winfo_manager() != "", "значок обновления не появился в шапке")
+        assert "9.9.9" in app.update_btn.cget("text"), app.update_btn.cget("text")
+        app.open_update_popup()
+        yield wait(0.3)
+        ut = " ".join(texts(app.update_win))
+        assert "Доступна версия 9.9.9" in ut and "GitHub: v9.9.9" in ut and "Новая функция" in ut, ut
+        app.update_win.event_generate("<Escape>")
+        yield wait(0.2)
+        assert app.update_win is None
+
+        updater.check_latest = lambda timeout=12: {
+            "current": L.__version__, "latest": L.__version__, "tag": f"v{L.__version__}",
+            "available": False, "notes": "", "url": updater.RELEASES_URL,
+            "asset_url": None, "asset_name": None, "sha256": None, "checked_at": time.time(),
+        }
+        app.check_updates(silent=True)
+        yield wait(3, lambda: app.update_btn.winfo_manager() == "", "значок обновления не скрылся")
+        app.open_update_popup()
+        yield wait(0.3)
+        ut = " ".join(texts(app.update_win))
+        assert "Установлена последняя версия" in ut, ut
+        app.close_update_popup()
+    finally:
+        updater.check_latest = real_upd
+    step("проверка обновлений GitHub: значок в шапке при новой версии, окно статуса с версией и заметками")
 
     print("Все проверки окна пройдены.")
     app.quit_app()

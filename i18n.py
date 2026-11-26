@@ -460,4 +460,21 @@ TEXTS = {
     "Чтобы добавить аккаунт {service}, установите {product} на этот компьютер.":
         ("To add a {service} account, install {product} on this computer.",
          "Щоб додати акаунт {service}, установіть {product} на цей комп'ютер."),
+    "Проверить обновления": ("Check for updates", "Перевірити оновлення"),
+    "Проверка обновлений…": ("Checking for updates…", "Перевірка оновлень…"),
+    "Установлена последняя версия": ("You are on the latest version", "Встановлено останню версію"),
+    "Доступна версия {ver}": ("Version {ver} available", "Доступна версія {ver}"),
+    "Версия: v{cur}  •  GitHub: v{lat}": ("Version: v{cur}  •  GitHub: v{lat}", "Версія: v{cur}  •  GitHub: v{lat}"),
+    "Версия: v{cur}": ("Version: v{cur}", "Версія: v{cur}"),
+    "Скачать и установить v{ver}": ("Download and install v{ver}", "Завантажити та встановити v{ver}"),
+    "Открыть релиз на GitHub": ("Open release on GitHub", "Відкрити реліз на GitHub"),
+    "Не удалось проверить обновления": ("Could not check for updates", "Не вдалося перевірити оновлення"),
+    "Загрузка обновления… {pct}%": ("Downloading update… {pct}%", "Завантаження оновлення… {pct}%"),
+    "Загрузка обновления…": ("Downloading update…", "Завантаження оновлення…"),
+    "Проверка SHA-256 и перезапуск…": ("Verifying SHA-256 and restarting…", "Перевірка SHA-256 і перезапуск…"),
+    "Контрольная сумма SHA-256 не совпала": ("SHA-256 checksum mismatch", "Контрольна сума SHA-256 не збіглася"),
+    "Автообновление доступно только для собранного AI Limits.exe":
+        ("Auto-update is only available for the packaged AI Limits.exe",
+         "Автооновлення доступне лише для зібраного AI Limits.exe"),
+    "Ошибка обновления: {error}": ("Update failed: {error}", "Помилка оновлення: {error}"),
 }

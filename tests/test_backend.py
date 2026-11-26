@@ -336,9 +336,14 @@ def test_switch():
                 diag.append("процесс 1: 5000 — входа нет")
             return [(Srv(), None)]
         ide_local.find_ide_servers = no_login
-        err = expect_error(RuntimeError, lambda: ide_switch.ide_switch_account("new@example.com", timeout=0.05,
-                                                                              bad_token=True))
-        assert "возвращён" in err and b"old@example.com" in STORE["blob"], err
+        old_nlt, ide_switch.NO_LOGIN_TIMEOUT = ide_switch.NO_LOGIN_TIMEOUT, 0.05
+        began = time.time()
+        try:
+            err = expect_error(RuntimeError, lambda: ide_switch.ide_switch_account("new@example.com", timeout=60,
+                                                                                  bad_token=True))
+        finally:
+            ide_switch.NO_LOGIN_TIMEOUT = old_nlt
+        assert time.time() - began < 5 and "возвращён" in err and b"old@example.com" in STORE["blob"], err
 
         # сервер молчит -> без отката, отдельная ошибка
         def silent(diag=None):
@@ -1055,6 +1060,51 @@ def test_ide_hub():
     step("новая IDE: ключ и порт сервера — из hub_<порт>.json по PID; без файла — «спросить нельзя»")
 
 
+def test_updater():
+    import hashlib
+    import io
+    import updater
+    assert updater.parse_version("v1.5.10") > updater.parse_version("1.5.8")
+    assert updater.parse_version("v1.5.8") == (1, 5, 8)
+    fake_sha = hashlib.sha256(b"fake-exe-bytes").hexdigest()
+    body = f"## What's New\n- **Feature A**\n- Item B\n\n**SHA-256:**\n```\n{fake_sha}\n```"
+    assert updater.extract_sha256(body) == fake_sha
+    notes = updater.clean_notes(body)
+    assert "Feature A" in notes and "SHA-256" not in notes and fake_sha not in notes, notes
+
+    real_fetch = updater._fetch_latest_json
+    updater._fetch_latest_json = lambda timeout=12: {
+        "tag_name": "v9.9.9",
+        "html_url": "https://github.com/Biz2k/AI-Limits/releases/tag/v9.9.9",
+        "body": body,
+        "assets": [{"name": "AI.Limits.exe", "browser_download_url": "https://example.com/AI.Limits.exe"}],
+    }
+    try:
+        info = updater.check_latest()
+        assert info["available"] and info["latest"] == "9.9.9" and info["sha256"] == fake_sha, info
+    finally:
+        updater._fetch_latest_json = real_fetch
+
+    class FakeResp(io.BytesIO):
+        headers = {"Content-Length": str(len(b"fake-exe-bytes"))}
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    real_open = updater.urllib.request.urlopen
+    updater.urllib.request.urlopen = lambda req, timeout=60: FakeResp(b"fake-exe-bytes")
+    try:
+        out = os.path.join(TMP, "upd_ok.exe")
+        got = updater.download_and_verify("https://example.com/AI.Limits.exe", fake_sha, dest_path=out)
+        assert got == out and os.path.exists(out)
+        bad = os.path.join(TMP, "upd_bad.exe")
+        err = expect_error(RuntimeError, lambda: updater.download_and_verify(
+            "https://example.com/AI.Limits.exe", "0" * 64, dest_path=bad))
+        assert "SHA-256" in err and not os.path.exists(bad), err
+    finally:
+        updater.urllib.request.urlopen = real_open
+    step("обновления GitHub: сравнение версий, разбор SHA-256 и заметок, проверка суммы при загрузке")
+
+
 def main():
     print("Проверка логики (вымышленные данные, папка", TMP + ")")
     test_dpapi()
@@ -1075,6 +1125,7 @@ def main():
     test_claude_switch()
     test_no_tokens_in_output()
     test_history()
+    test_updater()
     test_translations()
     left = plain_secrets() if WIN else []
     assert not left, left

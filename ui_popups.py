@@ -2,12 +2,16 @@
 import ctypes
 import ctypes.wintypes
 import os
+import sys
+import threading
 import time
 import tkinter as tk
 from tkinter import font as tkfont
+import webbrowser
 
 import i18n
 import limits as L
+import updater
 from i18n import T
 from ui_theme import fade_in
 from ui_theme import (
@@ -347,6 +351,18 @@ class PopupsMixin:
         chips("Язык", [(name, code, False) for code, name in i18n.LANGS], i18n.lang, self.set_lang)
         sep()
         item(box, "Открыть папку данных", lambda: run(self.open_data_folder))
+        upd_row = item(box, "Проверить обновления",
+                       lambda: run(lambda: self.open_update_popup(
+                           check_now=not (self._update_info and self._update_info.get("available")))))
+        upd_lb = upd_row.winfo_children()[-1]
+
+        def sync_upd():
+            info = getattr(self, "_update_info", None)
+            if info and info.get("available"):
+                _set(upd_lb, text=T("Доступна версия {ver}", ver=info["latest"]), fg=GREEN)
+            else:
+                _set(upd_lb, text=T("Проверить обновления"), fg=FG)
+        m["sync"].append(sync_upd)
         tk.Label(box, text=f"AI Limits {L.__version__}", bg=CARD, fg=FAINT, font=(FONT, 8), anchor="e",
                  padx=8).pack(fill="x", pady=(2, 0))
 
@@ -501,6 +517,7 @@ class PopupsMixin:
         self.persist()
         self.refresh_btn.config(text=T("⟳  Обновить"))
         self.menu_tip.text = T("Настройки")
+        self._sync_update_badge()
         for card in self.cards.values():
             card.retranslate()
         if self.footer is not None:
@@ -527,6 +544,214 @@ class PopupsMixin:
         f = self.root.focus_get()
         if f is None or not str(f).startswith(str(w)):
             self.close_menu()
+
+    # ------------------------------------------------ проверка и загрузка обновлений (GitHub Releases)
+    def maybe_check_updates(self):
+        """Тихая проверка обновлений раз в сутки после запуска окна."""
+        if getattr(self, "_update_checking", False):
+            return
+        last_ts = float(self.s.get("update_check_ts", 0) or 0)
+        if time.time() - last_ts >= updater.CHECK_INTERVAL:
+            self.check_updates(silent=True)
+
+    def check_updates(self, silent=False):
+        """Запускает проверку последнего релиза на GitHub в фоновом потоке."""
+        if getattr(self, "_update_checking", False):
+            return
+        self._update_checking = True
+        if not silent:
+            self._render_update_popup()
+
+        def work():
+            try:
+                info, err = updater.check_latest(), None
+            except Exception as e:
+                info, err = None, str(e)
+            try:
+                self.root.after(0, self._on_update_result, info, err, silent)
+            except tk.TclError:
+                pass
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_update_result(self, info, err, silent):
+        self._update_checking = False
+        if info is not None:
+            self._update_info = info
+            self.s["update_check_ts"] = info["checked_at"]
+            self.persist()
+        self._sync_update_badge()
+        if getattr(self, "update_win", None) and self.update_win.winfo_exists():
+            self._render_update_popup(err=err if not silent or info is None else None)
+
+    def _sync_update_badge(self):
+        """Значок доступного обновления в шапке основного окна рядом с ⚙."""
+        btn = getattr(self, "update_btn", None)
+        if not btn or not btn.winfo_exists():
+            return
+        info = getattr(self, "_update_info", None)
+        if info and info.get("available"):
+            _set(btn, text=f"● ↑ {info['latest']}", fg=GREEN)
+            self.update_tip.text = T("Доступна версия {ver}", ver=info["latest"])
+            if not btn.winfo_manager():
+                btn.pack(side="right", padx=(0, 6))
+        else:
+            self.update_tip.text = T("Проверить обновления")
+            if btn.winfo_manager():
+                btn.pack_forget()
+
+    def close_update_popup(self, *_):
+        w, self.update_win = getattr(self, "update_win", None), None
+        if w:
+            try:
+                w.destroy()
+            except tk.TclError:
+                pass
+
+    def open_update_popup(self, check_now=False):
+        """Тёмное окно статуса обновлений (версия, заметки релиза, проверка и установка с SHA-256)."""
+        self.close_menu()
+        self.close_update_popup()
+        p = tk.Toplevel(self.root)
+        fade_in(p)
+        p.overrideredirect(True)
+        p.attributes("-topmost", True)
+        p.configure(bg=LINE)
+        self.update_win = p
+        self._update_box = tk.Frame(p, bg=CARD, padx=16, pady=14)
+        self._update_box.pack(padx=1, pady=1)
+        p.bind("<Escape>", self.close_update_popup)
+        p.focus_force()
+        p.bind("<FocusOut>", lambda e: self.root.after(120, self._update_focus_check))
+        self._render_update_popup()
+        if check_now or self._update_info is None:
+            self.check_updates(silent=False)
+
+    def _update_focus_check(self):
+        w = getattr(self, "update_win", None)
+        if not w or getattr(self, "_update_downloading", False):
+            return
+        f = self.root.focus_get()
+        if f is None or not str(f).startswith(str(w)):
+            self.close_update_popup()
+
+    def _render_update_popup(self, err=None, status=None):
+        p = getattr(self, "update_win", None)
+        box = getattr(self, "_update_box", None)
+        if not p or not box or not p.winfo_exists():
+            return
+        for w in box.winfo_children():
+            w.destroy()
+        scale = self.root.winfo_fpixels("1i") / 96
+        wrap = max(260, round(320 * scale))
+        tk.Frame(box, bg=CARD, width=wrap, height=1).pack()  # фиксированная аккуратная ширина окна
+
+        info = getattr(self, "_update_info", None)
+        checking = getattr(self, "_update_checking", False)
+        avail = bool(info and info.get("available"))
+        if checking:
+            dot_col, head_txt, head_col = BLUE, T("Проверка обновлений…"), FG
+        elif err:
+            dot_col, head_txt, head_col = YELLOW, T("Не удалось проверить обновления"), YELLOW
+        elif avail:
+            dot_col, head_txt, head_col = GREEN, T("Доступна версия {ver}", ver=info["latest"]), GREEN
+        else:
+            dot_col, head_txt, head_col = GREEN, T("Установлена последняя версия"), GREEN
+
+        head = tk.Frame(box, bg=CARD)
+        head.pack(fill="x")
+        tk.Label(head, text="●", bg=CARD, fg=dot_col, font=(FONT, 11)).pack(side="left", padx=(0, 6))
+        tk.Label(head, text=head_txt, bg=CARD, fg=head_col, font=(FONT_D, 11, "bold"),
+                 anchor="w").pack(side="left", fill="x", expand=True)
+        x_btn = tk.Label(head, text="✕", bg=CARD, fg=MUTED, font=(FONT, 10), cursor="hand2", padx=5)
+        x_btn.pack(side="right")
+        x_btn.bind("<Enter>", lambda e: x_btn.config(fg=FG, bg=CARD_HI))
+        x_btn.bind("<Leave>", lambda e: x_btn.config(fg=MUTED, bg=CARD))
+        x_btn.bind("<Button-1>", self.close_update_popup)
+
+        ver_txt = (T("Версия: v{cur}  •  GitHub: v{lat}", cur=L.__version__, lat=info["latest"])
+                   if info else T("Версия: v{cur}", cur=L.__version__))
+        pill = tk.Frame(box, bg=CARD_HI, padx=10, pady=5)
+        pill.pack(anchor="w", pady=(10, 0))
+        tk.Label(pill, text=ver_txt, bg=CARD_HI, fg=FG, font=(FONT, 9, "bold")).pack()
+
+        if info and info.get("notes"):
+            tk.Label(box, text=info["notes"], bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",
+                     justify="left", wraplength=wrap).pack(fill="x", pady=(10, 0))
+        if err:
+            tk.Label(box, text=str(err), bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",
+                     justify="left", wraplength=wrap).pack(fill="x", pady=(8, 0))
+
+        self._update_status_lb = tk.Label(box, text=status or "", bg=CARD, fg=BLUE, font=(FONT, 9),
+                                          anchor="w", justify="left", wraplength=wrap)
+        if status:
+            self._update_status_lb.pack(fill="x", pady=(8, 0))
+
+        btns = tk.Frame(box, bg=CARD)
+        btns.pack(fill="x", pady=(12, 0))
+        can_install = avail and bool(info.get("asset_url")) and getattr(sys, "frozen", False)
+        if can_install and not getattr(self, "_update_downloading", False):
+            FlatButton(btns, "⬇  " + T("Скачать и установить v{ver}", ver=info["latest"]),
+                       self._start_exe_update, bg=GREEN, fg="#0e1014", hover="#57d99f").pack(fill="x", pady=(0, 6))
+        if not getattr(self, "_update_downloading", False):
+            FlatButton(btns, "⟳  " + T("Проверить обновления"), lambda: self.check_updates(silent=False),
+                       bg=CARD_HI if can_install else GREEN,
+                       fg=FG if can_install else "#0e1014",
+                       hover="#2a2f3a" if can_install else "#57d99f").pack(fill="x", pady=(0, 6))
+        url = (info or {}).get("url") or updater.RELEASES_URL
+        FlatButton(btns, T("Открыть релиз на GitHub"),
+                   lambda u=url: (webbrowser.open(u), self.close_update_popup()),
+                   bg=CARD_HI, fg=FG, hover="#2a2f3a").pack(fill="x")
+
+        p.update_idletasks()
+        w, h = p.winfo_reqwidth(), p.winfo_reqheight()
+        anchor = self.update_btn if self.update_btn.winfo_manager() else self.menu_btn
+        ax, ay = anchor.winfo_rootx(), anchor.winfo_rooty() + anchor.winfo_height() + 4
+        right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
+        left, top, work_right, bottom = self._work_area(ax, ay)
+        x = max(left + 8, min(ax, min(right, work_right) - w))
+        y = ay if ay + h <= bottom - 8 else max(top + 8, bottom - h - 8)
+        p.geometry(f"+{x}+{y}")
+
+    def _start_exe_update(self):
+        """Скачивает новый exe, сверяет SHA-256 и запускает замену после выхода."""
+        info = getattr(self, "_update_info", None)
+        if not info or not info.get("asset_url") or getattr(self, "_update_downloading", False):
+            return
+        self._update_downloading = True
+        self._render_update_popup(status=T("Загрузка обновления…"))
+
+        def set_status(text, fg=BLUE):
+            def _u():
+                lb = getattr(self, "_update_status_lb", None)
+                if lb and lb.winfo_exists():
+                    if not lb.winfo_manager():
+                        lb.pack(fill="x", pady=(8, 0))
+                    lb.config(text=text, fg=fg)
+            try:
+                self.root.after(0, _u)
+            except tk.TclError:
+                pass
+
+        def work():
+            try:
+                def prog(got, total):
+                    if total > 0:
+                        set_status(T("Загрузка обновления… {pct}%", pct=min(100, int(got * 100 / total))))
+                path = updater.download_and_verify(info["asset_url"], info.get("sha256"), on_progress=prog)
+                set_status(T("Проверка SHA-256 и перезапуск…"), GREEN)
+                updater.apply_exe_update(path)
+                self.root.after(200, self.quit_app)
+            except Exception as e:
+                def fail():
+                    self._update_downloading = False
+                    self._render_update_popup(err=T("Ошибка обновления: {error}", error=e))
+                try:
+                    self.root.after(0, fail)
+                except tk.TclError:
+                    pass
+
+        threading.Thread(target=work, daemon=True).start()
 
     def hide_alert(self):
         w, self.alert_win = getattr(self, "alert_win", None), None

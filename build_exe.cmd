@@ -45,7 +45,7 @@ python -m PyInstaller --noconfirm --clean --onefile --windowed --name "AI Limits
   --version-file "%TMPBUILD%\version_info.txt" ^
   --icon "%SRC%\ai_limits.ico" --paths "%SRC%" --hidden-import tray --hidden-import limits ^
   --hidden-import storage --hidden-import winapi --hidden-import cloud --hidden-import ide_local --hidden-import ide_switch ^
-  --hidden-import ui_theme --hidden-import ui_cards --hidden-import ui_popups --hidden-import ui_tray --hidden-import autostart --hidden-import ui_history --hidden-import ui_layout --hidden-import ui_accounts --hidden-import accounts --hidden-import codex_switch --hidden-import claude_switch --hidden-import history --hidden-import i18n ^
+  --hidden-import ui_theme --hidden-import ui_cards --hidden-import ui_popups --hidden-import ui_tray --hidden-import autostart --hidden-import ui_history --hidden-import ui_layout --hidden-import ui_accounts --hidden-import accounts --hidden-import codex_switch --hidden-import claude_switch --hidden-import history --hidden-import i18n --hidden-import updater ^
   --distpath "%TMPBUILD%\dist" --workpath "%TMPBUILD%\work" --specpath "%TMPBUILD%" ^
   "%SRC%\limits_gui.pyw"
 if errorlevel 1 (
