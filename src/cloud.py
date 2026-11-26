@@ -644,7 +644,7 @@ def ag_fetch(acc, all_models=False, local=None):
     if local and acc["email"].lower() in local:
         li = local[acc["email"].lower()]
         return {"plan": li["plan"], "models": li["rows"], "credits": None,
-                "source": "данные IDE Antigravity"}
+                "source": "данные Antigravity"}
     token = g_access_token(acc)
     key = acc["email"].lower()
     lca = cc_post("/v1internal:loadCodeAssist", token, {"metadata": CC_META}, key)

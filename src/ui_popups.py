@@ -675,8 +675,10 @@ class PopupsMixin:
         pill.pack(anchor="w", pady=(10, 0))
         tk.Label(pill, text=ver_txt, bg=CARD_HI, fg=FG, font=(FONT, 9, "bold")).pack()
 
-        if info and info.get("notes"):
-            tk.Label(box, text=info["notes"], bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",
+        notes = (updater.clean_notes(info["raw_notes"], i18n.lang())
+                 if info and info.get("raw_notes") else (info or {}).get("notes"))
+        if notes:
+            tk.Label(box, text=notes, bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",
                      justify="left", wraplength=wrap).pack(fill="x", pady=(10, 0))
         if err:
             tk.Label(box, text=str(err), bg=CARD, fg=MUTED, font=(FONT, 9), anchor="w",

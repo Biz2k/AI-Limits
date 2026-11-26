@@ -324,7 +324,9 @@ class TrayMixin:
                 continue
             d = {m["name"]: m["used"] for m in r.get("limits") or r.get("models") or []}
             rows[key] = (t["title"], accent, d.get("Неделя"), d.get("5 часов"),
-                         "OFFLINE" if r.get("offline") else "IDE" if t["ide"] else None)
+                         "OFFLINE" if r.get("offline") else
+                         {"claude": "Claude", "chatgpt": "Codex", "google": "Antigravity"}.get(t["kind"], "Antigravity")
+                         if t["ide"] else None)
         rows = [rows[k] for k in self.ordered(list(rows))]
 
         p = tk.Toplevel(self.root)
@@ -360,8 +362,10 @@ class TrayMixin:
         for i, (name, accent, week, h5, note) in enumerate(rows, start=2):
             tk.Frame(box, bg=accent, width=3, height=18).grid(row=i, column=0, padx=(0, 8), pady=5)
             tk.Label(box, text=name[:16], bg=CARD, fg=FG, font=(FONT, 10)).grid(row=i, column=1, sticky="w")
-            if note:  # своя колонка: метки IDE стоят одна под другой (владелец, 22.11.2026)
-                tk.Label(box, text=T(note), bg=CARD, fg={"IDE": GREEN, "загрузка": MUTED, "OFFLINE": YELLOW}.get(note, RED),
+            if note:  # своя колонка: метки стоят одна под другой (владелец, 22.11.2026)
+                fg_n = {"Antigravity": GREEN, "Claude": GREEN, "Codex": GREEN,
+                        "загрузка": MUTED, "OFFLINE": YELLOW}.get(note, RED)
+                tk.Label(box, text=T(note) if note in ("загрузка", "ошибка") else note, bg=CARD, fg=fg_n,
                          font=(FONT, 8, "bold")).grid(row=i, column=2, sticky="w", padx=(6, 14))
             cell(i, 3, week, 14)
             cell(i, 5, h5, 0)

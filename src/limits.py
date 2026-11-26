@@ -186,7 +186,7 @@ def collect(all_models):
         for email, li in local.items():
             if email not in known:
                 ag.append((email, {"plan": li["plan"], "models": li["rows"], "credits": None,
-                                   "source": "данные IDE Antigravity", "ide_only": True}))
+                                   "source": "данные Antigravity", "ide_only": True}))
         return res(fc), merge_with_cache(ag), (res(fx) if fx else None), [(p, res(f)) for p, f in fp]
 
 
@@ -323,10 +323,10 @@ def main():
         if a.browser:
             res = ide_switch.ide_login_browser(on_status=say)
         elif not a.email:
-            ap.error("укажите email для переключения IDE (или --browser для входа через окно Google)")
+            ap.error("укажите email для переключения Antigravity (или --browser для входа через окно Google)")
         else:
             res = ide_switch.ide_switch_account(a.email, on_status=say, bad_token=a.test_rollback)
-        print(c("92", f"IDE переключена на {res}"))
+        print(c("92", f"Antigravity переключена на {res}"))
         return
     if a.cmd == "restore-ide":
         meta = ide_switch.latest_ide_backup()
@@ -337,13 +337,13 @@ def main():
             ts = f"{dt.datetime.strptime(ts, '%Y%m%d_%H%M%S'):%d.%m.%Y %H:%M:%S}"
         except ValueError:
             pass
-        print(f"Копия от {ts}, аккаунт IDE в ней: {meta.get('previous_email') or 'без входа'}.")
-        print("IDE Antigravity будет закрыта и запущена снова, если она открыта.")
-        if not a.yes and input("Вернуть учётные данные IDE из этой копии? [y/N] ").strip().lower() not in ("y", "д"):
+        print(f"Копия от {ts}, аккаунт Antigravity в ней: {meta.get('previous_email') or 'без входа'}.")
+        print("Antigravity будет закрыта и запущена снова, если она открыта.")
+        if not a.yes and input("Вернуть учётные данные Antigravity из этой копии? [y/N] ").strip().lower() not in ("y", "д"):
             print("Отменено.")
             return
         ide_switch.ide_restore_backup(meta, on_status=lambda t: print(dim(t)))
-        print(c("92", "Учётные данные IDE возвращены."))
+        print(c("92", "Учётные данные Antigravity возвращены."))
         return
 
     while True:

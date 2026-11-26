@@ -82,13 +82,13 @@ TEXTS = {
                                                  "Увійдіть у Google у браузері, що відкрився…"),
     "Добавлен {email}": ("Added {email}", "Додано {email}"),
     "Вход не выполнен: {error}": ("Sign-in failed: {error}", "Вхід не виконано: {error}"),
-    "Переключить IDE на {email}?": ("Switch the IDE to {email}?", "Перемкнути IDE на {email}?"),
+    "Переключить Antigravity на {email}?": ("Switch Antigravity to {email}?", "Перемкнути Antigravity на {email}?"),
     "Antigravity перезапустится, незавершённые ответы агента прервутся.":
         ("Antigravity will restart; unfinished agent replies will be interrupted.",
          "Antigravity перезапуститься, незавершені відповіді агента перервуться."),
-    "IDE: подготовка…": ("IDE: preparing…", "IDE: підготовка…"),
-    "IDE теперь работает под {email}": ("The IDE now runs as {email}", "IDE тепер працює під {email}"),
-    "В IDE вошёл {now}, а не {email}": ("The IDE signed in as {now}, not {email}", "В IDE увійшов {now}, а не {email}"),
+    "Antigravity: подготовка…": ("Antigravity: preparing…", "Antigravity: підготовка…"),
+    "Antigravity теперь работает под {email}": ("Antigravity now runs as {email}", "Antigravity тепер працює під {email}"),
+    "В Antigravity вошёл {now}, а не {email}": ("Antigravity signed in as {now}, not {email}", "В Antigravity увійшов {now}, а не {email}"),
     "никто": ("nobody", "ніхто"),
     "Не удалось сменить аккаунт: {error}": ("Could not switch the account: {error}",
                                             "Не вдалося змінити акаунт: {error}"),
@@ -187,9 +187,9 @@ TEXTS = {
     'программа входа завершилась без входа':
         ('the sign-in program exited without signing in',
          'програма входу завершилася без входу'),
-    'IDE Antigravity запущена, но вход не выполнен':
-        ('The Antigravity IDE is running but not signed in',
-         'IDE Antigravity запущено, але вхід не виконано'),
+    'Antigravity запущена, но вход не выполнен':
+        ('Antigravity is running but not signed in',
+         'Antigravity запущено, але вхід не виконано'),
     '{product}: аккаунт {email} теперь называется «{name}»':
         ('{product}: account {email} is now called “{name}”',
          '{product}: акаунт {email} тепер називається «{name}»'),
@@ -269,19 +269,19 @@ TEXTS = {
     # ---- карточки
     "нет данных": ("no data", "немає даних"),
     "Облако сейчас отдаёт только другой лимит.\nЗначение появится, когда он сбросится,\n"
-    "или если войти этим аккаунтом в IDE Antigravity.":
+    "или если войти этим аккаунтом в Antigravity.":
         ("The cloud currently reports only the other limit.\nThe value will appear when that one resets,\n"
-         "or if you sign in to the Antigravity IDE with this account.",
+         "or if you sign in to Antigravity with this account.",
          "Хмара зараз віддає лише інший ліміт.\nЗначення з'явиться, коли він скинеться,\n"
-         "або якщо увійти цим акаунтом в IDE Antigravity."),
+         "або якщо увійти цим акаунтом в Antigravity."),
     "Google просит подтвердить этот аккаунт (Verify your account).\n"
-    "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
+    "Лимиты Gemini недоступны, пока вы не войдёте им в Antigravity\n"
     "и не подтвердите аккаунт.":
         ("Google asks to verify this account (Verify your account).\n"
-         "Gemini limits are unavailable until you sign in with it in the Antigravity IDE\n"
+         "Gemini limits are unavailable until you sign in with it in Antigravity\n"
          "and verify the account.",
          "Google просить підтвердити цей акаунт (Verify your account).\n"
-         "Ліміти Gemini недоступні, доки ви не увійдете ним в IDE Antigravity\n"
+         "Ліміти Gemini недоступні, доки ви не увійдете ним в Antigravity\n"
          "і не підтвердите акаунт."),
     "Войдите в {email} в открывшемся браузере…":
         ("Sign in to {email} in the browser that opened…", "Увійдіть у {email} у браузері, що відкрився…"),
@@ -301,9 +301,9 @@ TEXTS = {
     "Сервер временно ограничил запросы — повторю через {min} мин":
         ("The server is temporarily limiting requests — will retry in {min} min",
          "Сервер тимчасово обмежив запити — повторю через {min} хв"),
-    "IDE запущена; новая версия IDE не даёт проверить вход — проверьте аккаунт в самой IDE":
-        ("The IDE is running; the new IDE version does not allow checking the sign-in — check the account in the IDE",
-         "IDE запущена; нова версія IDE не дає перевірити вхід — перевірте акаунт у самій IDE"),
+    "Antigravity запущена; новая версия Antigravity не даёт проверить вход — проверьте аккаунт в самой Antigravity":
+        ("Antigravity is running; the new Antigravity version does not allow checking the sign-in — check the account in Antigravity",
+         "Antigravity запущена; нова версія Antigravity не дає перевірити вхід — перевірте акаунт у самій Antigravity"),
     "Google просит подтвердить аккаунт {email} — переключение отменено. Войдите в него заново кнопкой ↻ в "
     "«Управлении аккаунтами»":
         ("Google asks to verify the account {email} — the switch was cancelled. Sign in to it again with ↻ in "
@@ -321,11 +321,11 @@ TEXTS = {
     "Сохранённое значение от {seen}.\nСейчас облако отдаёт другой лимит.":
         ("Saved value from {seen}.\nThe cloud currently reports a different limit.",
          "Збережене значення від {seen}.\nЗараз хмара віддає інший ліміт."),
-    "Этот аккаунт сейчас вошёл в IDE Antigravity": ("This account is signed in to the Antigravity IDE",
-                                                   "Цей акаунт зараз увійшов в IDE Antigravity"),
-    "→ в IDE": ("→ to IDE", "→ в IDE"),
-    "Сделать этот аккаунт текущим в IDE Antigravity": ("Make this the current account of the Antigravity IDE",
-                                                      "Зробити цей акаунт поточним в IDE Antigravity"),
+    "Этот аккаунт сейчас вошёл в Antigravity": ("This account is signed in to Antigravity",
+                                                   "Цей акаунт зараз увійшов в Antigravity"),
+    "→ в Antigravity": ("→ to Antigravity", "→ в Antigravity"),
+    "Сделать этот аккаунт текущим в Antigravity": ("Make this the current account of Antigravity",
+                                                      "Зробити цей акаунт поточним в Antigravity"),
     # ---- названия лимитов и источников (в данных остаются русскими)
     "Неделя": ("Week", "Тиждень"),
     "5 часов": ("5 hours", "5 годин"),
@@ -333,7 +333,7 @@ TEXTS = {
     "Неделя Sonnet": ("Week Sonnet", "Тиждень Sonnet"),
     "Действующий лимит": ("Active limit", "Чинний ліміт"),
     "неделя": ("week", "тиждень"),
-    "данные IDE Antigravity": ("Antigravity IDE data", "дані IDE Antigravity"),
+    "данные Antigravity": ("Antigravity data", "дані Antigravity"),
     "облако": ("cloud", "хмара"),
     "облако · действующий лимит": ("cloud · active limit", "хмара · чинний ліміт"),
     # ---- прогноз и график
@@ -400,9 +400,9 @@ TEXTS = {
                                                           "Google не видав refresh_token — спробуйте ще раз"),
     "Antigravity не закрылся за {timeout} с": ("Antigravity did not close in {timeout} s",
                                                "Antigravity не закрився за {timeout} с"),
-    "Исполняемый файл IDE Antigravity не найден: {exe}": ("Antigravity IDE executable not found: {exe}",
-                                                         "Виконуваний файл IDE Antigravity не знайдено: {exe}"),
-    "Не указан email аккаунта для IDE": ("No account email given for the IDE", "Не вказано email акаунта для IDE"),
+    "Исполняемый файл Antigravity не найден: {exe}": ("Antigravity executable not found: {exe}",
+                                                         "Виконуваний файл Antigravity не знайдено: {exe}"),
+    "Не указан email аккаунта для Antigravity": ("No account email given for Antigravity", "Не вказано email акаунта для Antigravity"),
     "Аккаунт {email} не найден в {file}": ("Account {email} not found in {file}", "Акаунт {email} не знайдено в {file}"),
     "У аккаунта {email} отсутствует refresh_token": ("Account {email} has no refresh token",
                                                     "В акаунта {email} немає refresh_token"),
@@ -411,49 +411,49 @@ TEXTS = {
                                                       "Не вдалося оновити токен для {email}: {error}"),
     "Google не вернул access_token для {email}": ("Google did not return an access token for {email}",
                                                  "Google не повернув access_token для {email}"),
-    "Не найден Antigravity.exe — убедитесь, что IDE Antigravity установлена":
-        ("Antigravity.exe not found — make sure the Antigravity IDE is installed",
-         "Не знайдено Antigravity.exe — переконайтеся, що IDE Antigravity встановлено"),
+    "Не найден Antigravity.exe — убедитесь, что Antigravity установлена":
+        ("Antigravity.exe not found — make sure Antigravity is installed",
+         "Не знайдено Antigravity.exe — переконайтеся, що Antigravity встановлено"),
     "Резервное копирование прежних настроек…": ("Backing up the current credentials…",
                                                "Резервне копіювання попередніх налаштувань…"),
-    "Закрытие IDE Antigravity…": ("Closing the Antigravity IDE…", "Закриття IDE Antigravity…"),
+    "Закрытие Antigravity…": ("Closing Antigravity…", "Закриття Antigravity…"),
     "Подстановка токена в Credential Manager и настройки…": ("Writing the token to Credential Manager and settings…",
                                                             "Підставлення токена в Credential Manager і налаштування…"),
-    "Перезапуск IDE Antigravity…": ("Restarting the Antigravity IDE…", "Перезапуск IDE Antigravity…"),
+    "Перезапуск Antigravity…": ("Restarting Antigravity…", "Перезапуск Antigravity…"),
     "Проверка входа через GetUserStatus…": ("Checking the sign-in…", "Перевірка входу…"),
-    "в IDE обнаружен аккаунт {found}, а не {email}": ("the IDE shows account {found}, not {email}",
-                                                     "в IDE виявлено акаунт {found}, а не {email}"),
-    "IDE не вошла в аккаунт за {timeout} с": ("the IDE did not sign in within {timeout} s",
-                                              "IDE не увійшла в акаунт за {timeout} с"),
-    "IDE не ответила за {timeout} с — проверьте аккаунт в самой IDE":
-        ("The IDE did not respond within {timeout} s — check the account in the IDE itself",
-         "IDE не відповіла за {timeout} с — перевірте акаунт у самій IDE"),
-    "Не получилось — возвращаю прежний аккаунт IDE…": ("It did not work — restoring the previous IDE account…",
-                                                      "Не вийшло — повертаю попередній акаунт IDE…"),
+    "в Antigravity обнаружен аккаунт {found}, а не {email}": ("Antigravity shows account {found}, not {email}",
+                                                     "в Antigravity виявлено акаунт {found}, а не {email}"),
+    "Antigravity не вошла в аккаунт за {timeout} с": ("Antigravity did not sign in within {timeout} s",
+                                              "Antigravity не увійшла в акаунт за {timeout} с"),
+    "Antigravity не ответила за {timeout} с — проверьте аккаунт в самой Antigravity":
+        ("Antigravity did not respond within {timeout} s — check the account in Antigravity itself",
+         "Antigravity не відповіла за {timeout} с — перевірте акаунт у самій Antigravity"),
+    "Не получилось — возвращаю прежний аккаунт Antigravity…": ("It did not work — restoring the previous Antigravity account…",
+                                                      "Не вийшло — повертаю попередній акаунт Antigravity…"),
     "{error}. Вернуть прежний аккаунт тоже не удалось ({error2}) — копии лежат в {folder}, журнал: {log}":
         ("{error}. Restoring the previous account failed too ({error2}) — backups are in {folder}, log: {log}",
          "{error}. Повернути попередній акаунт теж не вдалося ({error2}) — копії лежать у {folder}, журнал: {log}"),
-    "{error}. Прежний аккаунт IDE ({previous}) возвращён (журнал: {log})":
-        ("{error}. The previous IDE account ({previous}) was restored (log: {log})",
-         "{error}. Попередній акаунт IDE ({previous}) повернуто (журнал: {log})"),
+    "{error}. Прежний аккаунт Antigravity ({previous}) возвращён (журнал: {log})":
+        ("{error}. The previous Antigravity account ({previous}) was restored (log: {log})",
+         "{error}. Попередній акаунт Antigravity ({previous}) повернуто (журнал: {log})"),
     "без входа": ("not signed in", "без входу"),
     "Резервных копий нет в {folder}": ("No backups in {folder}", "Резервних копій немає в {folder}"),
     "Сохранение нынешних учётных данных…": ("Saving the current credentials…", "Збереження поточних облікових даних…"),
     "Возврат учётных данных из копии…": ("Restoring the credentials from the backup…",
                                         "Повернення облікових даних із копії…"),
-    "Запуск IDE Antigravity…": ("Starting the Antigravity IDE…", "Запуск IDE Antigravity…"),
-    "IDE Antigravity не запущена — откройте её и повторите": ("The Antigravity IDE is not running — open it and try again",
-                                                             "IDE Antigravity не запущено — відкрийте її та повторіть"),
-    "IDE: выход из текущего аккаунта…": ("IDE: signing out of the current account…",
-                                        "IDE: вихід із поточного акаунта…"),
+    "Запуск Antigravity…": ("Starting Antigravity…", "Запуск Antigravity…"),
+    "Antigravity не запущена — откройте её и повторите": ("Antigravity is not running — open it and try again",
+                                                             "Antigravity не запущено — відкрийте її та повторіть"),
+    "Antigravity: выход из текущего аккаунта…": ("Antigravity: signing out of the current account…",
+                                        "Antigravity: вихід із поточного акаунта…"),
     "Выберите аккаунт в открывшемся окне Google…": ("Choose an account in the Google window that opened…",
                                                    "Виберіть акаунт у вікні Google, що відкрилося…"),
-    "IDE не выполнила вход: {error}": ("The IDE did not sign in: {error}", "IDE не виконала вхід: {error}"),
-    "IDE ответила, но вход не выполнен — войдите в самой IDE": ("The IDE responded but did not sign in — sign in in the IDE itself",
-                                                               "IDE відповіла, але вхід не виконано — увійдіть у самій IDE"),
-    "Вход не выполнен за 5 минут — войдите в самой IDE (журнал: {log})":
-        ("Sign-in was not completed in 5 minutes — sign in in the IDE itself (log: {log})",
-         "Вхід не виконано за 5 хвилин — увійдіть у самій IDE (журнал: {log})"),
+    "Antigravity не выполнила вход: {error}": ("Antigravity did not sign in: {error}", "Antigravity не виконала вхід: {error}"),
+    "Antigravity ответила, но вход не выполнен — войдите в самой Antigravity": ("Antigravity responded but did not sign in — sign in in Antigravity itself",
+                                                               "Antigravity відповіла, але вхід не виконано — увійдіть у самій Antigravity"),
+    "Вход не выполнен за 5 минут — войдите в самой Antigravity (журнал: {log})":
+        ("Sign-in was not completed in 5 minutes — sign in in Antigravity itself (log: {log})",
+         "Вхід не виконано за 5 хвилин — увійдіть у самій Antigravity (журнал: {log})"),
     "Понятно": ("OK", "Зрозуміло"),
     "Поиск ключей {product}…": ("Looking for {product} keys…", "Пошук ключів {product}…"),
     "Установите {product}": ("Install {product}", "Установіть {product}"),

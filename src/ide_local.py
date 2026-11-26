@@ -388,6 +388,6 @@ def start_ide(exe_path=None):
     import subprocess
     exe = exe_path or find_ide_executable()
     if not exe or not os.path.exists(exe):
-        raise RuntimeError(T("Исполняемый файл IDE Antigravity не найден: {exe}", exe=exe))
+        raise RuntimeError(T("Исполняемый файл Antigravity не найден: {exe}", exe=exe))
     # 0x00000008 = DETACHED_PROCESS, 0x00000200 = CREATE_NEW_PROCESS_GROUP
     return subprocess.Popen([exe], creationflags=0x00000008 | 0x00000200, close_fds=True)

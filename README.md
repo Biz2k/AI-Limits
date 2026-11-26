@@ -20,12 +20,12 @@ window.
 
 **Accounts**
 - On the first start every account your apps are already signed in to shows up by itself: one card each for
-  **Claude Code**, **Codex** and the **Antigravity** IDE, titled with the app name. A card always follows the
+  **Claude Code**, **Codex** and **Antigravity**, titled with the app name. A card always follows the
   account its app is signed in to right now.
 - ⚙ → **Add account**: Claude, ChatGPT or Google. Claude and ChatGPT accounts sign in through Claude Code
   (`claude auth login`) and Codex (`codex login`) into a separate profile folder of AI Limits, so your own
   Claude Code and Codex sign-ins stay untouched; Google signs in in the browser (OAuth keys are picked up
-  automatically from the installed Antigravity IDE). If the required app is not installed (and no saved Google
+  automatically from the installed Antigravity). If the required app is not installed (and no saved Google
   key is present), a pop-up prompts you to install it. If the new account is the one an app is signed in to,
   that app's card simply takes its name.
 - Every account has a name of your choice, unique within the app (by default the part of the email before «@»; if
@@ -37,19 +37,19 @@ window.
   reset time and countdown.
 - The app's own sign-ins of Claude Code and Codex are only read (replaced only when you press "→ to Codex" or
   "→ to Claude"); the tokens of the profiles AI Limits signed in itself are kept encrypted and refreshed by AI Limits.
-- The limits of a closed Antigravity IDE come from the cloud using the IDE's own saved sign-in.
-- Reads the most accurate numbers straight from a running Antigravity IDE; falls back to the cloud API otherwise.
+- The limits of a closed Antigravity come from the cloud using Antigravity's own saved sign-in.
+- Reads the most accurate numbers straight from a running Antigravity; falls back to the cloud API otherwise.
 - The account with the most weekly limit left, of any service, is shown at the top right ("max … 100%").
 - Usage history (kept for 60 days): click a limit row to see its usage chart and a forecast of how long the limit
   will last at the current pace.
 - Clear status badges: yellow **OFFLINE** (keeping the last known values dimmed) when the network is down, and
   red **LOGOUT** when Google requires account verification.
 
-**Antigravity IDE account**
-- **"→ to IDE" button**: signs the Antigravity IDE in to another saved account without the Google sign-in page
-  (the IDE is restarted; the previous credentials are backed up and restored if the switch fails).
-- Works when the IDE is closed too: it starts the IDE (or the `agy` CLI if the IDE is not installed) and skips the
-  switch when the IDE is already signed in to that account.
+**Antigravity account**
+- **"→ to Antigravity" button**: signs Antigravity in to another saved account without the Google sign-in page
+  (Antigravity is restarted; the previous credentials are backed up and restored if the switch fails).
+- Works when Antigravity is closed too: it starts Antigravity (or the `agy` CLI if Antigravity is not installed) and skips the
+  switch when Antigravity is already signed in to that account.
 
 **Codex account**
 - **"→ to Codex" button** on added ChatGPT accounts: makes Codex use that account. The Codex app is closed and
@@ -103,7 +103,7 @@ not needed.
 2. Accounts your apps (**Claude Code**, **Codex**, **Antigravity**) are already signed in to appear automatically.
 3. To add more accounts, open **⚙ → Add account** → Claude, ChatGPT or Google.
    - The exe contains no keys. When you add a Google account, AI Limits automatically finds the installed
-     **Antigravity** IDE, extracts its OAuth client id and secret, and saves them encrypted in
+     **Antigravity**, extracts its OAuth client id and secret, and saves them encrypted in
      `%APPDATA%\ai-limits\keys.dat`. If Antigravity is not installed, it uses the saved key from `keys.dat` (or
      the `ANTIGRAVITY_OAUTH_CLIENT_ID` / `ANTIGRAVITY_OAUTH_CLIENT_SECRET` environment variables); if neither
      the app nor a key is found, a pop-up asks you to install the required app (Antigravity, Claude Code or Codex).
@@ -112,17 +112,17 @@ not needed.
 ## Console version
 
 ```
-python limits.py                  show all limits
-python limits.py -w 60            refresh every 60 seconds
-python limits.py --json           JSON output
-python limits.py --version        show the version
-python limits.py add              add a Google account
-python limits.py accounts         list saved accounts
-python limits.py remove <email>   remove an account
-python limits.py switch-ide <email>    sign the Antigravity IDE in to this account
-python limits.py switch-ide --browser  the same through the Google sign-in page
-python limits.py restore-ide           put back the IDE credentials from the latest backup
-python limits.py keys                  enter the Antigravity OAuth client id and secret
+python src\limits.py                  show all limits
+python src\limits.py -w 60            refresh every 60 seconds
+python src\limits.py --json           JSON output
+python src\limits.py --version        show the version
+python src\limits.py add              add a Google account
+python src\limits.py accounts         list saved accounts
+python src\limits.py remove <email>   remove an account
+python src\limits.py switch-ide <email>    sign Antigravity in to this account
+python src\limits.py switch-ide --browser  the same through the Google sign-in page
+python src\limits.py restore-ide           put back Antigravity credentials from the latest backup
+python src\limits.py keys                  enter Antigravity OAuth client id and secret
 ```
 
 Claude and ChatGPT accounts added in the window are shown by the console version too (`--json`: `profiles`).
@@ -134,27 +134,27 @@ Claude and ChatGPT accounts added in the window are shown by the console version
 - Python 3.13 (the Microsoft Store build works)
 - Claude Code (`~/.claude/.credentials.json`) — optional, for the Claude card and adding/switching Claude accounts
 - Codex (`~/.codex/auth.json`) — optional, for the Codex card and adding/switching ChatGPT accounts
-- Antigravity IDE — optional, for live IDE data, account switching and automatic Google OAuth key discovery
+- Antigravity — optional, for live Antigravity data, account switching and automatic Google OAuth key discovery
 - PyInstaller 6.x — only to build the exe
 
 **Run from source:**
 
 ```
-pythonw limits_gui.pyw
+pythonw src\limits_gui.pyw
 ```
 
 OAuth keys for Antigravity are **not included** in the repository or in the exe: when adding a Google account,
-AI Limits reads them automatically from the installed Antigravity IDE and stores them encrypted in
+AI Limits reads them automatically from the installed Antigravity and stores them encrypted in
 `%APPDATA%\ai-limits\keys.dat`. If Antigravity is not installed on that machine, you can provide them manually
-with `python limits.py keys`, via `ANTIGRAVITY_OAUTH_CLIENT_ID` / `ANTIGRAVITY_OAUTH_CLIENT_SECRET`, or by
-copying `local_keys.example.py` to `local_keys.py` (the same public client values are also in the open-source
+with `python src\limits.py keys`, via `ANTIGRAVITY_OAUTH_CLIENT_ID` / `ANTIGRAVITY_OAUTH_CLIENT_SECRET`, or by
+copying `src\local_keys.example.py` to `src\local_keys.py` (the same public client values are also in the open-source
 npm package [`antigravity-usage`](https://www.npmjs.com/package/antigravity-usage)).
 
 **Build the exe:**
 
 ```
 python -m pip install --user pyinstaller
-build_exe.cmd
+src\build_exe.cmd
 ```
 
 The script runs the checks from `tests\` (on made-up data; the app window opens for a few seconds), then builds a
@@ -171,11 +171,11 @@ Everything lives in `%APPDATA%\ai-limits\`:
 | --- | --- |
 | `accounts.json` | Google refresh tokens of the accounts you added (encrypted) |
 | `profiles.json`, `profiles\` | Claude and ChatGPT accounts you added: one folder each, the sign-in in `creds.dat` (encrypted) |
-| `keys.dat` | OAuth keys (Antigravity client id and secret, filled automatically from the installed IDE; encrypted) |
+| `keys.dat` | OAuth keys (Antigravity client id and secret, filled automatically from installed Antigravity; encrypted) |
 | `cache.json` | last seen limit values (kept until each limit resets) |
 | `gui.json` | window settings, account names |
 | `history.csv` | limit values over time, kept for 60 days (no tokens) |
-| `ide_backups\` | copies of the IDE credentials taken before each account switch (last 5, encrypted) |
+| `ide_backups\` | copies of Antigravity credentials taken before each account switch (last 5, encrypted) |
 | `ide_switch.log` | account switch log (tokens are masked) |
 | `codex_backups\` | copies of the Codex sign-in taken before each "→ to Codex" (last 5, encrypted) |
 | `claude_backups\` | copies of the Claude Code sign-in taken before each "→ to Claude" (last 5, encrypted) |
@@ -185,28 +185,28 @@ Tokens, keys and the credential copies are encrypted with Windows DPAPI: only yo
 computer can decrypt them, so the folder is useless on another machine or for another user (add the accounts and
 keys again there). Programs running under your own account can still decrypt them.
 
-## How IDE account switching works
+## How Antigravity account switching works
 
-When you press "→ to IDE", the app gets a fresh access token for the chosen account, backs up the current IDE
-credentials, closes the IDE, writes the token into the IDE's entry in Windows Credential Manager
-(`gemini:antigravity`) and two files in `%APPDATA%\Antigravity\`, starts the IDE again and checks through the IDE's
-local server that the right account is signed in. If the IDE shows another account or no account, the backup is
+When you press "→ to Antigravity", the app gets a fresh access token for the chosen account, backs up the current Antigravity
+credentials, closes Antigravity, writes the token into Antigravity's entry in Windows Credential Manager
+(`gemini:antigravity`) and two files in `%APPDATA%\Antigravity\`, starts Antigravity again and checks through Antigravity's
+local server that the right account is signed in. If Antigravity shows another account or no account, the backup is
 restored.
 
-If the IDE is closed and its saved sign-in already belongs to the chosen account, the app just starts the IDE.
-If the IDE is not installed, the `agy` CLI is started instead (it uses the same Credential Manager entry); there
-is no IDE server to check the account against in that case.
+If Antigravity is closed and its saved sign-in already belongs to the chosen account, the app just starts Antigravity.
+If Antigravity is not installed, the `agy` CLI is started instead (it uses the same Credential Manager entry); there
+is no Antigravity server to check the account against in that case.
 
-This is not an official mechanism. It may stop working after an IDE update, and you use it at your own risk.
+This is not an official mechanism. It may stop working after Antigravity update, and you use it at your own risk.
 
 ## Disclaimer
 
 - The app relies on undocumented endpoints of Anthropic, OpenAI and Google and on the OAuth clients of Claude
   Code, Codex and Antigravity (extra Claude and ChatGPT accounts are signed in by Claude Code and Codex themselves).
   They can change or be blocked at any time, and using them may be against the services' terms.
-- To get both Gemini limits for accounts that are not signed in to the IDE, requests to Google identify the app
-  as a recent version of the Antigravity IDE.
-- It reads and writes credentials of the Antigravity IDE, Codex, and Claude Code on your machine (when switching
+- To get both Gemini limits for accounts that are not signed in to Antigravity, requests to Google identify the app
+  as a recent version of Antigravity.
+- It reads and writes credentials of Antigravity, Codex, and Claude Code on your machine (when switching
   accounts, with automatic backups beforehand).
 - No warranty of any kind; see the license.
 

@@ -12,7 +12,7 @@ import traceback
 import types
 from importlib.machinery import SourceFileLoader
 
-SRC = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 sys.path.insert(0, SRC)
 G = SourceFileLoader("limits_gui", os.path.join(SRC, "limits_gui.pyw")).load_module()
 L = G.L
@@ -222,7 +222,7 @@ def main():
     assert not any("хватит" in t for t in texts(app.popup)), texts(app.popup)
     box = app.popup.winfo_children()[0]
     labels = [w for w in walk_all(box) if isinstance(w, tk.Label)]
-    xs = {w.winfo_x() for w in labels if w.cget("text") == "IDE"}
+    xs = {w.winfo_x() for w in labels if w.cget("text") in ("Antigravity", "Claude", "Codex")}
     assert xs and len(xs) == 1, xs                                      # метки IDE — одна под другой
     right = max(w.winfo_x() + w.winfo_width() for w in labels if w.cget("text").endswith("%"))
     strips = [w for w in box.grid_slaves(column=0) if isinstance(w, tk.Frame) and int(w.grid_info()["row"]) > 1]
@@ -389,8 +389,8 @@ def main():
     def seen():
         return " | ".join(texts(root)) + " | " + app.status.cget("text")
     cards = len(app.cards)
-    for code, words in (("en", ("Refresh", "Week", "5 hours", "max", "Updated", "→ to IDE")),
-                        ("uk", ("Оновити", "Тиждень", "5 годин", "макс.", "Оновлено", "→ в IDE")),
+    for code, words in (("en", ("Refresh", "Week", "5 hours", "max", "Updated", "→ to Antigravity")),
+                        ("uk", ("Оновити", "Тиждень", "5 годин", "макс.", "Оновлено", "→ в Antigravity")),
                         ("ru", ("Обновить", "Неделя", "5 часов", "макс.", "Обновлено"))):
         app.set_lang(code)
         yield wait()
@@ -443,7 +443,7 @@ def main():
     assert t_ide["title"] == "b" and not app.tile_info["a@example.com"]["ide"] and "antigravity" not in app.cards
     assert app.card_order == order_before, (order_before, app.card_order)  # плитки на местах, переехала метка IDE
     assert app.cards["b@example.com"] is card_b and card_b.ide_mode == "current" and app.cards["a@example.com"].ide_mode == "switch"
-    assert "IDE теперь работает под b@example.com" == app.status.cget("text"), app.status.cget("text")
+    assert "Antigravity теперь работает под b@example.com" == app.status.cget("text"), app.status.cget("text")
     assert not app.footer.winfo_ismapped()                              # сообщение занимает всю строку
     app.status_sticky = 0
     app.set_status_updated()
@@ -466,13 +466,13 @@ def main():
     app.refresh()
     cb = app.cards["b@example.com"]
     yield wait(10, lambda: not app.loading and cb.ide_mode == "switch", "«● IDE» у IDE без входа")
-    assert "antigravity" not in app.cards and cb.ide.cget("text") == "→ в IDE"
+    assert "antigravity" not in app.cards and cb.ide.cget("text") == "→ в Antigravity"
     assert app.cards["a@example.com"].ide_mode == "switch"
     # сервер новой IDE (ключ скрыт): аккаунт IDE — по записи входа, «● IDE»
     L.local_ide_info = lambda: {"running": False, "window": True, "hidden": True, "email": None, "accounts": {}}
     app.refresh()
     yield wait(10, lambda: not app.loading and cb.ide_mode == "current", "нет «● IDE» при новой IDE")
-    assert cb.ide.cget("text") == "● IDE" and app.cards["a@example.com"].ide_mode == "switch"
+    assert cb.ide.cget("text") == "● Antigravity" and app.cards["a@example.com"].ide_mode == "switch"
     # аккаунт не в программе — полоса и белые надписи тусклее; в программе — как были
     ca = app.cards["a@example.com"]
     assert ca.quiet and not cb.quiet and cb.strip.cget("bg") == cb.accent and ca.strip.cget("bg") != ca.accent
@@ -494,12 +494,12 @@ def main():
     app.refresh()
     yield wait(10, lambda: not app.loading and app.tile_info["b@example.com"]["ide"], "нет записи входа IDE")
     yield wait()
-    assert cb.ide_mode == "switch" and cb.ide.cget("text") == "→ в IDE", (cb.ide_mode, cb.ide.cget("text"))
+    assert cb.ide_mode == "switch" and cb.ide.cget("text") == "→ в Antigravity", (cb.ide_mode, cb.ide.cget("text"))
     assert "○" not in " ".join(texts(app.body))                         # серой «○ IDE» нет (владелец)
     L.local_ide_info = fake_ide_info
     app.refresh()
     yield wait(10, lambda: not app.loading and app.cards["b@example.com"].ide_mode == "current", "IDE не вернулась")
-    assert app.cards["b@example.com"].ide.cget("text") == "● IDE"
+    assert app.cards["b@example.com"].ide.cget("text") == "● Antigravity"
     step("IDE открыта без входа или закрыта — у аккаунта записи входа «→ в IDE», без лишней плитки и меток")
 
     app.alerted = set()
@@ -1002,7 +1002,7 @@ def main():
     assert c2.ide_mode == "switch_codex" and c2.ide.cget("text") == "→ в Codex", (c2.ide_mode, c2.ide.cget("text"))
     assert app.cards["codex:cx@example.com"].ide_mode == "current_codex"
     assert app.cards["codex:cx@example.com"].ide.cget("text") == "● Codex"
-    assert app.cards["a@example.com"].ide.cget("text") in ("● IDE", "→ в IDE")
+    assert app.cards["a@example.com"].ide.cget("text") in ("● Antigravity", "→ в Antigravity")
     assert c2.ide.cget("bg") == app.cards["a@example.com"].ide.cget("bg")  # одного вида с «→ в IDE»
     switched = []
     real_switch = ui_accounts.CX.switch

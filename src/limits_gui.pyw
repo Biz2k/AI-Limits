@@ -291,7 +291,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
 
     # Загрузка по частям: окно рисуется сразу, а программы (Claude Code, Codex, IDE Antigravity), каждый
     # Google-аккаунт и каждый свой профиль грузятся в своих потоках и появляются по мере готовности.
-    IDE_SRC = "данные IDE Antigravity"
+    IDE_SRC = "данные Antigravity"
 
     RATE_PAUSE = 300  # сервер ответил 429 и не сказал, сколько ждать — пауза запросов этой части, с
 
@@ -409,7 +409,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             return
         card = self.cards.get(email)
         self.confirm(card.ide if card else self.menu_btn,
-                     T("Переключить IDE на {email}?", email=email),
+                     T("Переключить Antigravity на {email}?", email=email),
                      T("Antigravity перезапустится, незавершённые ответы агента прервутся."),
                      lambda: self._switch_ide_go(email))
 
@@ -417,7 +417,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         if getattr(self, "ide_switching", False):
             return
         self.ide_switching = True
-        self.say(T("IDE: подготовка…"), GOOGLE)
+        self.say(T("Antigravity: подготовка…"), GOOGLE)
 
         def say(text):
             self.root.after(0, lambda: self.say(text, GOOGLE))
@@ -426,8 +426,8 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
             try:
                 now = L.ide_switch_account(email, on_status=say)
                 ok = (now or "").lower() == email.lower()
-                msg, col = ((T("IDE теперь работает под {email}", email=now), GREEN) if ok else
-                            (T("В IDE вошёл {now}, а не {email}", now=now or T("никто"), email=email), YELLOW))
+                msg, col = ((T("Antigravity теперь работает под {email}", email=now), GREEN) if ok else
+                            (T("В Antigravity вошёл {now}, а не {email}", now=now or T("никто"), email=email), YELLOW))
                 expect = email if ok else None
             except L.IdeSwitchUnverified as e:
                 msg, col, expect = str(e), YELLOW, email
@@ -540,7 +540,7 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
                 ide=None if off else mode,  # у LOGOUT нет ни кнопки «→ в …», ни метки IDE (владелец)
                 badge_fg=YELLOW if offline else RED if off else None, dim=off or offline, quiet=quiet,
                 badge_tip=T("Google просит подтвердить этот аккаунт (Verify your account).\n"
-                            "Лимиты Gemini недоступны, пока вы не войдёте им в IDE Antigravity\n"
+                            "Лимиты Gemini недоступны, пока вы не войдёте им в Antigravity\n"
                             "и не подтвердите аккаунт.") if off and not offline else "",
                 summary=summary,
                 msg=None if rows or folded else (T("Нет данных о лимитах Gemini") if t["kind"] == "google"

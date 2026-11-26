@@ -86,7 +86,7 @@ class RowView:
         _set(self.label, text=T(self.name))
         _set(self.nodata, text=T("нет данных"))
         self.nodata_tip.text = T("Облако сейчас отдаёт только другой лимит.\nЗначение появится, когда он сбросится,\n"
-                                 "или если войти этим аккаунтом в IDE Antigravity.")
+                                 "или если войти этим аккаунтом в Antigravity.")
 
     def update(self, used, resets_at, seen, warn, dim=False, quiet=False):
         """dim — аккаунт отключён (Google просит подтвердить его): процент и полоса приглушены.
@@ -238,18 +238,17 @@ class CardView:
             self.ide_mode = mode
             prog = (mode or "").partition("_")[2]
             if mode and mode.startswith("current"):
-                # «● Codex» / «● Claude Code» (1.5.4, владелец: рядом с «→ в Codex» надпись «IDE» путала)
-                self.ide.config(text={"codex": "● Codex", "claude": "● Claude Code"}.get(prog, "● IDE"),
+                self.ide.config(text={"codex": "● Codex", "claude": "● Claude Code"}.get(prog, "● Antigravity"),
                                 bg=CARD, fg=GREEN, font=(FONT, 9, "bold"), cursor="", padx=1)
                 self.ide_tip.text = {"codex": T("Этот аккаунт сейчас вошёл в Codex"),
                                      "claude": T("Этот аккаунт сейчас вошёл в Claude Code")}.get(
-                                         prog, T("Этот аккаунт сейчас вошёл в IDE Antigravity"))
+                                         prog, T("Этот аккаунт сейчас вошёл в Antigravity"))
             elif mode:  # кнопки смены аккаунта программы — одного вида у всех сервисов (решение владельца)
-                self.ide.config(text={"codex": T("→ в Codex"), "claude": T("→ в Claude")}.get(prog, T("→ в IDE")),
+                self.ide.config(text={"codex": T("→ в Codex"), "claude": T("→ в Claude")}.get(prog, T("→ в Antigravity")),
                                 bg=CARD_HI, fg=MUTED, font=(FONT, 9), cursor="hand2", padx=6)
                 self.ide_tip.text = {"codex": T("Сделать этот аккаунт текущим в Codex"),
                                      "claude": T("Сделать этот аккаунт текущим в Claude Code")}.get(
-                                         prog, T("Сделать этот аккаунт текущим в IDE Antigravity"))
+                                         prog, T("Сделать этот аккаунт текущим в Antigravity"))
             _vis(self.ide, bool(mode))
 
         msg = spec["msg"]  # (текст, цвет, шрифт, отступы) или None

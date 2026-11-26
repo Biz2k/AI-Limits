@@ -10,7 +10,7 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 for _k in ("ANTIGRAVITY_OAUTH_CLIENT_ID", "ANTIGRAVITY_OAUTH_CLIENT_SECRET", "ANTIGRAVITY_USER_AGENT"):
     os.environ.pop(_k, None)
 
@@ -362,7 +362,7 @@ def test_switch():
         IDE["hidden"], began = True, time.time()
         err = expect_error(ide_switch.IdeSwitchUnverified, lambda: ide_switch.ide_switch_account("new@example.com",
                                                                                                timeout=60))
-        assert time.time() - began < 10 and "новая версия IDE" in err and b"new@example.com" in STORE["blob"], err
+        assert time.time() - began < 10 and "новая версия Antigravity" in err and b"new@example.com" in STORE["blob"], err
         IDE["hidden"] = False
 
         # Google требует подтвердить аккаунт -> отказ до закрытия IDE, запись входа не тронута
@@ -854,7 +854,7 @@ def test_history():
 def test_translations():
     import ast
     import re
-    src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
     used = {}
     for name in sorted(os.listdir(src_dir)):
         if not name.endswith((".py", ".pyw")) or name == "i18n.py":
@@ -875,7 +875,7 @@ def test_translations():
         assert len(pair) == 2 and all(pair), text
         for tr in pair:
             assert fields(tr) == fields(text), ("подстановки перевода не совпадают", text, tr)
-    for name in ("Неделя", "5 часов", "облако", "данные IDE Antigravity", "1 мин", "выкл"):
+    for name in ("Неделя", "5 часов", "облако", "данные Antigravity", "1 мин", "выкл"):
         assert name in i18n.TEXTS, name  # строки, которые переводятся при показе, а не в месте появления
     assert i18n.set_lang("xx") == "en" and i18n.T("Неделя") == "Week" and i18n.day(0) == "Mon"
     assert i18n.set_lang("uk") == "uk" and i18n.T("Добавлен {email}", email="a@b") == "Додано a@b"
@@ -1067,10 +1067,16 @@ def test_updater():
     assert updater.parse_version("v1.5.10") > updater.parse_version("1.5.8")
     assert updater.parse_version("v1.5.8") == (1, 5, 8)
     fake_sha = hashlib.sha256(b"fake-exe-bytes").hexdigest()
-    body = f"## What's New\n- **Feature A**\n- Item B\n\n**SHA-256:**\n```\n{fake_sha}\n```"
+    body = (
+        f"## What's New (EN)\n- **Feature A**\n\n"
+        f"## Что нового (RU)\n- **Функция А**\n\n"
+        f"## Що нового (UK)\n- **Функція А**\n\n"
+        f"**SHA-256:**\n```\n{fake_sha}\n```"
+    )
     assert updater.extract_sha256(body) == fake_sha
-    notes = updater.clean_notes(body)
-    assert "Feature A" in notes and "SHA-256" not in notes and fake_sha not in notes, notes
+    assert updater.clean_notes(body, "en") == "• Feature A", updater.clean_notes(body, "en")
+    assert updater.clean_notes(body, "ru") == "• Функция А", updater.clean_notes(body, "ru")
+    assert updater.clean_notes(body, "uk") == "• Функція А", updater.clean_notes(body, "uk")
 
     real_fetch = updater._fetch_latest_json
     updater._fetch_latest_json = lambda timeout=12: {

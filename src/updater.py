@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 
 import version
+import i18n
 from i18n import T
 
 REPO = "Biz2k/AI-Limits"
@@ -32,12 +33,38 @@ def extract_sha256(notes):
     return m.group(1).lower() if m else None
 
 
-def clean_notes(notes, max_chars=480):
-    """Убирает блок SHA-256 и лишнюю markdown-разметку для показа в окне обновлений."""
+_LANG_HEAD_RE = re.compile(r"^#{1,3}\s*(?:.*\((EN|RU|UK)\)|(EN|RU|UK))\s*$", re.IGNORECASE)
+
+
+def _pick_lang_section(notes, lang):
+    """Если заметки релиза разбиты на секции по языкам (## ... (EN)/(RU)/(UK)), возвращает нужную."""
+    sections = {}
+    cur = None
+    for raw in (notes or "").splitlines():
+        s = raw.strip()
+        if "SHA-256" in s.upper() or re.fullmatch(r"[0-9a-fA-F]{64}", s) or s.startswith("```"):
+            break
+        m = _LANG_HEAD_RE.match(s)
+        if m:
+            cur = (m.group(1) or m.group(2)).lower()
+            sections.setdefault(cur, [])
+            continue
+        if cur is not None:
+            sections[cur].append(raw)
+    if not sections:
+        return notes
+    want = (lang or i18n.lang() or "en").lower()
+    chosen = sections.get(want) or sections.get("en") or next(iter(sections.values()))
+    return "\n".join(chosen)
+
+
+def clean_notes(notes, lang=None, max_chars=480):
+    """Выбирает заметки для текущего языка, убирает блок SHA-256 и лишнюю markdown-разметку."""
     if not notes:
         return ""
+    body = _pick_lang_section(notes, lang)
     lines = []
-    for raw in notes.splitlines():
+    for raw in body.splitlines():
         s = raw.strip()
         if not s:
             continue
@@ -86,6 +113,7 @@ def check_latest(timeout=TIMEOUT):
         "tag": tag or f"v{latest}",
         "available": parse_version(latest) > parse_version(version.__version__),
         "notes": clean_notes(body),
+        "raw_notes": body,
         "url": str(data.get("html_url") or RELEASES_URL),
         "asset_url": asset_url,
         "asset_name": asset_name,

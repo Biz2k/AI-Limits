@@ -7,12 +7,12 @@ rem Нужен PyInstaller:  python -m pip install --user pyinstaller
 set "SRC=%~dp0"
 set "SRC=%SRC:~0,-1%"
 cd /d "%SRC%"
-for %%I in ("%SRC%\..") do set "OUT=%%~fI"
+for %%I in ("%SRC%\..\..") do set "OUT=%%~fI"
 set "EXE=%OUT%\AI Limits.exe"
 set "TMPBUILD=%TEMP%\ai-limits-build"
 
 echo Проверки (окно программы откроется на несколько секунд)...
-python "%SRC%\tests\run_tests.py"
+python "%SRC%\..\tests\run_tests.py"
 if errorlevel 1 (
   echo ОШИБКА: проверки не прошли, сборка отменена.
   goto :end

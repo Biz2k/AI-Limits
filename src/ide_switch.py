@@ -240,7 +240,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
     say = on_status or (lambda s: None)
     target_email = (target_email or "").strip()
     if not target_email:
-        raise ValueError(T("Не указан email аккаунта для IDE"))
+        raise ValueError(T("Не указан email аккаунта для Antigravity"))
 
     accs = cloud.load_accounts()
     acc = next((a for a in accs if a.get("email", "").lower() == target_email.lower()), None)
@@ -262,12 +262,12 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
     exe_path = ide_local.find_ide_executable()
     cli_path = None if exe_path else ide_local.find_cli_executable()
     if not exe_path and not cli_path:
-        raise RuntimeError(T("Не найден Antigravity.exe — убедитесь, что IDE Antigravity установлена"))
+        raise RuntimeError(T("Не найден Antigravity.exe — убедитесь, что Antigravity установлена"))
     if not was_running and not bad_token:  # IDE закрыта, а в ней и так нужный аккаунт — только запустить
         stored = stored_ide_account()
         if stored and stored.lower() == acc["email"].lower():
             ide_local._ide_log("IDE закрыта, в ней уже", stored, "— запуск без смены аккаунта")
-            say(T("Запуск IDE Antigravity…"))
+            say(T("Запуск Antigravity…"))
             _launch(exe_path, cli_path)
             return stored
 
@@ -302,7 +302,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
     ide_local._ide_log("Бэкап сохранён:", backup_meta.get("timestamp"), "предыдущий email:", str(previous))
     writer_id = backup_meta.get("writer_id") or secrets.token_urlsafe(16)[:22]
 
-    say(T("Закрытие IDE Antigravity…"))
+    say(T("Закрытие Antigravity…"))
     try:
         ide_local.stop_ide()
     except Exception as e:
@@ -314,7 +314,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         say(T("Подстановка токена в Credential Manager и настройки…"))
         scope_file, saved_user_scope = _ide_write_account(acc, token_resp, writer_id)
 
-        say(T("Перезапуск IDE Antigravity…"))
+        say(T("Перезапуск Antigravity…"))
         _launch(exe_path, cli_path)
         if not exe_path:  # у консольной версии нет окна IDE и её сервера — проверять вход негде
             return acc["email"]
@@ -342,8 +342,8 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
                 ide_local._ide_log(f"Ожидание {int(began - started)} с (опрос {time.time() - began:.1f} с):", line)
                 seen_line, seen_at = line, time.time()
             if not servers and ide_local.ide_server_hidden():  # новая IDE: ждать ответа её сервера бессмысленно
-                raise IdeSwitchUnverified(T("IDE запущена; новая версия IDE не даёт проверить вход — "
-                                            "проверьте аккаунт в самой IDE"))
+                raise IdeSwitchUnverified(T("Antigravity запущена; новая версия Antigravity не даёт проверить вход — "
+                                            "проверьте аккаунт в самой Antigravity"))
             cur = next((us["email"] for _, us in servers if us and us.get("email")), None)
             state = cur or ("нет входа" if servers else None)
             if state == "нет входа":
@@ -370,17 +370,17 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
                 ide_local._ide_log("В IDE обнаружен другой аккаунт:", cur)
             last_detected = cur
         if last_detected:
-            raise RuntimeError(T("в IDE обнаружен аккаунт {found}, а не {email}", found=last_detected, email=acc["email"]))
+            raise RuntimeError(T("в Antigravity обнаружен аккаунт {found}, а не {email}", found=last_detected, email=acc["email"]))
         if state == "нет входа":
             waited = max(1, int(round(time.time() - started))) if early_rollback else timeout
-            raise RuntimeError(T("IDE не вошла в аккаунт за {timeout} с", timeout=waited))
-        raise IdeSwitchUnverified(T("IDE не ответила за {timeout} с — проверьте аккаунт в самой IDE", timeout=timeout))
+            raise RuntimeError(T("Antigravity не вошла в аккаунт за {timeout} с", timeout=waited))
+        raise IdeSwitchUnverified(T("Antigravity не ответила за {timeout} с — проверьте аккаунт в самой Antigravity", timeout=timeout))
     except IdeSwitchUnverified as e:
         ide_local._ide_log("Проверка не удалась, отката нет:", str(e))
         raise
     except Exception as e:
         ide_local._ide_log("Сбой переключения:", str(e), "— возвращаю прежние учётные данные")
-        say(T("Не получилось — возвращаю прежний аккаунт IDE…"))
+        say(T("Не получилось — возвращаю прежний аккаунт Antigravity…"))
         try:
             ide_local.stop_ide()
             restore_ide_credentials(backup_meta)
@@ -392,7 +392,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
             raise RuntimeError(T("{error}. Вернуть прежний аккаунт тоже не удалось ({error2}) — "
                                  "копии лежат в {folder}, журнал: {log}", error=e, error2=e2,
                                  folder=storage.IDE_BACKUP_DIR, log=ide_local.IDE_LOG)) from None
-        raise RuntimeError(T("{error}. Прежний аккаунт IDE ({previous}) возвращён (журнал: {log})", error=e,
+        raise RuntimeError(T("{error}. Прежний аккаунт Antigravity ({previous}) возвращён (журнал: {log})", error=e,
                              previous=previous or T("без входа"), log=ide_local.IDE_LOG)) from None
 
 
@@ -425,7 +425,7 @@ def ide_restore_backup(meta=None, on_status=None):
              "аккаунт:", str(meta.get("previous_email")), "===")
     was_running = ide_local._ide_open()
     exe_path = ide_local.find_ide_executable() if was_running else None
-    say(T("Закрытие IDE Antigravity…"))
+    say(T("Закрытие Antigravity…"))
     try:
         ide_local.stop_ide()
     except Exception as e:
@@ -438,7 +438,7 @@ def ide_restore_backup(meta=None, on_status=None):
     restore_ide_credentials(meta)
     ide_local._ide_log("Учётные данные возвращены")
     if was_running and exe_path:
-        say(T("Запуск IDE Antigravity…"))
+        say(T("Запуск Antigravity…"))
         ide_local.start_ide(exe_path)
     return meta
 
@@ -450,12 +450,12 @@ def ide_login_browser(on_status=None, timeout=300):
     say = on_status or (lambda s: None)
     servers = ide_local.find_ide_servers()
     if not servers:
-        raise RuntimeError(T("IDE Antigravity не запущена — откройте её и повторите"))
+        raise RuntimeError(T("Antigravity не запущена — откройте её и повторите"))
     srv, us = servers[0]
     before = (us or {}).get("email")
     ide_local._ide_log("вход через браузер; сейчас в IDE:", str(before), "порт", str(srv.port))
     if before:
-        say(T("IDE: выход из текущего аккаунта…"))
+        say(T("Antigravity: выход из текущего аккаунта…"))
         ide_local._ide_log("AuthLogout ->", srv.call("AuthLogout", {}))
 
     result = {}
@@ -495,7 +495,7 @@ def ide_login_browser(on_status=None, timeout=300):
                 ide_local._ide_log("вход выполнен:", cur)
                 return cur
             err = result.get("err")
-            raise RuntimeError(T("IDE не выполнила вход: {error}", error=err) if err and "resp" not in result
-                               else T("IDE ответила, но вход не выполнен — войдите в самой IDE"))
+            raise RuntimeError(T("Antigravity не выполнила вход: {error}", error=err) if err and "resp" not in result
+                               else T("Antigravity ответила, но вход не выполнен — войдите в самой Antigravity"))
     ide_local._ide_log("время ожидания вышло, вход не выполнен")
-    raise RuntimeError(T("Вход не выполнен за 5 минут — войдите в самой IDE (журнал: {log})", log=ide_local.IDE_LOG))
+    raise RuntimeError(T("Вход не выполнен за 5 минут — войдите в самой Antigravity (журнал: {log})", log=ide_local.IDE_LOG))
