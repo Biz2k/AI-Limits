@@ -65,6 +65,20 @@ def suggest_name(kind, email, taken):
     return next(c for c in cands if not name_error(c, taken))
 
 
+def suggest_product_name(kind, taken):
+    """Имя по умолчанию для автоматически сохранённого аккаунта программы:
+    Antigravity / Claude Code / Codex; если занято — Antigravity1, Antigravity2 и т.д."""
+    base = PRODUCT[kind]
+    used = {_norm(t) for t in taken}
+    if _norm(base) not in used:
+        return base
+    for i in range(1, 1000):
+        cand = f"{base}{i}"[:NAME_MAX]
+        if _norm(cand) not in used:
+            return cand
+    return f"{base}{uuid.uuid4().hex[:4]}"[:NAME_MAX]
+
+
 # ---------------------------------------------------------------- профили
 def profiles_dir():
     return os.path.join(storage.APPDIR, "profiles")

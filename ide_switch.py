@@ -190,6 +190,24 @@ def stored_ide_login():
         return None
 
 
+def adopt_ide_account(ignored=()):
+    """Сохраняет обнаруженный вход IDE (gemini:antigravity) в accounts.json, если его там ещё нет
+    и пользователь не удалял его вручную (ignored). Возвращает добавленный dict или None."""
+    login = stored_ide_login()
+    if not login or not login[0] or not login[1]:
+        return None
+    email, rt = login[0].strip(), login[1].strip()
+    low = email.lower()
+    if low in {(x or "").lower() for x in (ignored or ())}:
+        return None
+    accs = cloud.load_accounts()
+    if any((a.get("email") or "").lower() == low for a in accs):
+        return None
+    acc = {"email": email, "refresh_token": rt, "project": None}
+    cloud.save_accounts(accs + [acc])
+    return acc
+
+
 def _launch(exe_path, cli_path):
     """Запуск IDE, а если она не установлена — консольной версии agy.exe."""
     if exe_path:
@@ -275,6 +293,7 @@ def ide_switch_account(target_email, on_status=None, timeout=90, bad_token=False
         acc = dict(acc, refresh_token="ai-limits-rollback-test")
 
     say(T("Резервное копирование прежних настроек…"))
+    adopt_ide_account()
     backup_meta = backup_ide_credentials()
     previous = backup_meta.get("previous_email")
     ide_local._ide_log("Бэкап сохранён:", backup_meta.get("timestamp"), "предыдущий email:", str(previous))

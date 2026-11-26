@@ -79,6 +79,24 @@ def _keep_current(oauth, account):
     return p, True
 
 
+def adopt_current(ignored=()):
+    """Сохраняет текущий вход Claude Code в профиль AI Limits, если его там ещё нет и он не в ignored.
+    Возвращает созданный профиль (dict) или None."""
+    creds = _load(storage.CLAUDE_CREDS) or {}
+    cfg = _load(config_path()) or {}
+    oauth, account = creds.get("claudeAiOauth") or {}, cfg.get("oauthAccount") or {}
+    email = (account.get("emailAddress") or "").strip()
+    if not email or not oauth.get("accessToken"):
+        return None
+    key = accounts.ident("claude", email)
+    if key in {(x or "").lower() for x in (ignored or ())}:
+        return None
+    if any(p["kind"] == "claude" and accounts.ident("claude", p["email"]) == key for p in accounts.load_profiles()):
+        return None
+    p, created = _keep_current(oauth, account)
+    return p if created else None
+
+
 def _write(oauth, account):
     """Записать токены и аккаунт, сохранив всё остальное в обоих файлах (перечитываются перед записью)."""
     creds = _load(storage.CLAUDE_CREDS) or {}

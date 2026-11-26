@@ -52,6 +52,9 @@ L.codex_installed = lambda: STATE["codex"]  # настоящий вход Codex 
 L.codex_fetch = lambda profile=None: {"plan": "plus", "limits": rows(20.0, 5.0)}
 L.stored_ide_account = lambda: STATE["ide_account"]  # запись входа IDE Antigravity — подменена
 L.stored_ide_login = lambda: None
+L.adopt_ide_account = lambda ignored=(): None
+ui_accounts.CL.adopt_current = lambda ignored=(): None
+ui_accounts.CX.adopt_current = lambda ignored=(): None
 accounts.claude_ide_email = lambda: "me@example.com"  # аккаунты программ — вымышленные
 accounts.codex_ide_email = lambda: "cx@example.com"
 L.ag_fetch = lambda acc, a=False, l=None: {"plan": "Pro", "models": rows(40.0, 3.0), "credits": None,
@@ -1040,6 +1043,24 @@ def main():
             del root.winfo_pointerxy
         L.sync_program_keys = real_sync
     step("предупреждение об установке программы: появляется под курсором в пределах правой грани окна")
+
+    # автосохранение обнаруженного аккаунта программы с нумерацией дефолтных имён: Antigravity -> Antigravity1 -> Antigravity2
+    real_adopt = L.adopt_ide_account
+    seq = iter([{"email": "ag1@example.com", "refresh_token": "r1"},
+                {"email": "ag2@example.com", "refresh_token": "r2"},
+                {"email": "ag3@example.com", "refresh_token": "r3"}])
+    L.adopt_ide_account = lambda ignored=(): next(seq, None)
+    try:
+        for _ in range(3):
+            app.plan_jobs()
+        assert app.names()["ag1@example.com"] == "Antigravity", app.names()
+        assert app.names()["ag2@example.com"] == "Antigravity1", app.names()
+        assert app.names()["ag3@example.com"] == "Antigravity2", app.names()
+    finally:
+        L.adopt_ide_account = real_adopt
+        for k in ("ag1@example.com", "ag2@example.com", "ag3@example.com"):
+            app.names().pop(k, None)
+    step("автосохранение обнаруженных аккаунтов: дефолтные имена Antigravity, Antigravity1, Antigravity2")
 
     print("Все проверки окна пройдены.")
     app.quit_app()

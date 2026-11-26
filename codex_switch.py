@@ -140,6 +140,28 @@ def _keep_current(raw):
     return p, True
 
 
+def adopt_current(ignored=()):
+    """Сохраняет текущий вход Codex в профиль AI Limits, если его там ещё нет и он не в ignored.
+    Возвращает созданный профиль (dict) или None."""
+    raw = _read_auth()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    email, _ = accounts.codex_identity(data)
+    if not email or not (data.get("tokens") or {}).get("access_token"):
+        return None
+    key = accounts.ident("chatgpt", email)
+    if key in {(x or "").lower() for x in (ignored or ())}:
+        return None
+    if any(p["kind"] == "chatgpt" and accounts.ident("chatgpt", p["email"]) == key for p in accounts.load_profiles()):
+        return None
+    p, created = _keep_current(raw)
+    return p if created else None
+
+
 def switch(profile, on_status=lambda s: None):
     """Сделать профиль ChatGPT аккаунтом Codex. Возвращает {"email": новый, "kept": профиль прежнего аккаунта,
     "created": создан ли он сейчас, "restarted": перезапущено ли приложение}."""

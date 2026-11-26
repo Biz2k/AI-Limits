@@ -478,9 +478,31 @@ def test_accounts():
     assert accounts.suggest_name("chatgpt", "alex@example.com", taken) == "Codex alex"
     assert accounts.suggest_name("claude", "alex@example.com", taken + ["Claude alex"]) == "Claude alex 2"
     assert accounts.suggest_name("google", "new@example.com", taken) == "new"
+    assert accounts.suggest_product_name("google", []) == "Antigravity"
+    assert accounts.suggest_product_name("google", ["Antigravity"]) == "Antigravity1"
+    assert accounts.suggest_product_name("google", ["Antigravity", "Antigravity1"]) == "Antigravity2"
+    assert accounts.suggest_product_name("claude", ["Claude Code"]) == "Claude Code1"
+    assert accounts.suggest_product_name("chatgpt", ["Codex", "Codex1"]) == "Codex2"
     assert accounts.ident("google", "A@Example.com") == "a@example.com"
     assert accounts.ident("chatgpt", "A@x") == "codex:a@x" and accounts.ident("claude", "A@x") == "claude:a@x"
-    step("имена аккаунтов: дубликат не применяется, при совпадении — приставка сервиса; ключи аккаунтов")
+    step("имена аккаунтов: дубликат не применяется, при совпадении — приставка сервиса; автоимена программ с номером; ключи аккаунтов")
+
+    # автосохранение обнаруженного аккаунта IDE в accounts.json (переживает logout, уважает ignored)
+    real_login, real_load, real_save = ide_switch.stored_ide_login, cloud.load_accounts, cloud.save_accounts
+    mem_accs = []
+    cloud.load_accounts = lambda: list(mem_accs)
+    cloud.save_accounts = lambda xs: (mem_accs.clear(), mem_accs.extend(xs))
+    try:
+        ide_switch.stored_ide_login = lambda: ("auto-ag@example.com", "1//fake-auto-rt")
+        got = ide_switch.adopt_ide_account()
+        assert got and got["email"] == "auto-ag@example.com"
+        assert ide_switch.adopt_ide_account() is None  # повторно не дублируется
+        ide_switch.stored_ide_login = lambda: None     # logout в IDE — запись в accounts.json остаётся
+        assert any(a["email"] == "auto-ag@example.com" for a in cloud.load_accounts())
+        ide_switch.stored_ide_login = lambda: ("ignored-ag@example.com", "1//fake-ign-rt")
+        assert ide_switch.adopt_ide_account(ignored=["ignored-ag@example.com"]) is None
+    finally:
+        ide_switch.stored_ide_login, cloud.load_accounts, cloud.save_accounts = real_login, real_load, real_save
 
     # вход в профиль: программа записала файл — он шифруется, открытая копия удаляется, email известен
     pc = {"kind": "claude", "dir": "claude-test"}

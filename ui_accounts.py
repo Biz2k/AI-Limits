@@ -76,9 +76,28 @@ class AccountsMixin:
     # ------------------------------------------------ что загружать
     def plan_jobs(self):
         """Аккаунты программ и задания загрузки: {часть: (функция, аргументы…)}."""
+        self.has_prog = {"claude": L.claude_installed(), "chatgpt": L.codex_installed()}
+        ignored = self.s.get("ignored_ide") or ()
+        changed = False
+        adopted = L.adopt_ide_account(ignored)
+        if adopted:
+            ident = adopted["email"].lower()
+            if ident not in self.names():
+                self.names()[ident] = A.suggest_product_name("google", self.taken_names(ident))
+                changed = True
+        for kind, mod in (("claude", CL), ("chatgpt", CX)):
+            if not self.has_prog.get(kind):
+                continue
+            prof = mod.adopt_current(ignored)
+            if prof:
+                ident = A.ident(kind, prof["email"])
+                if ident not in self.names():
+                    self.names()[ident] = A.suggest_product_name(kind, self.taken_names(ident))
+                    changed = True
+        if changed:
+            self.persist()
         self.g_accs = L.load_accounts()
         self.profiles = A.load_profiles()
-        self.has_prog = {"claude": L.claude_installed(), "chatgpt": L.codex_installed()}
         self.ide_email = {"claude": A.claude_ide_email() if self.has_prog["claude"] else None,
                           "chatgpt": A.codex_ide_email() if self.has_prog["chatgpt"] else None,
                           "google": L.stored_ide_account()}  # закрытая IDE; запущенная уточнит в "local"
@@ -292,7 +311,10 @@ class AccountsMixin:
                         return
                     if ident not in names:
                         names[ident] = A.suggest_name(kind, email, self.taken_names(ident))
-                        self.persist()
+                    ign = [x for x in (self.s.get("ignored_ide") or []) if x.lower() != ident]
+                    if ign != (self.s.get("ignored_ide") or []):
+                        self.s["ignored_ide"] = ign
+                    self.persist()
                     now_in = {"claude": A.claude_ide_email, "chatgpt": A.codex_ide_email}.get(
                         kind, lambda: (getattr(self, "ide_email", {}) or {}).get("google"))()  # аккаунт программы сейчас
                     match = ident == A.ident(kind, now_in or "")
@@ -411,6 +433,9 @@ class AccountsMixin:
                 L.save_accounts([x for x in L.load_accounts() if x["email"].lower() != ident])
             elif prof:
                 A.remove_profile(prof)
+            ign = self.s.setdefault("ignored_ide", [])
+            if ident not in ign:
+                ign.append(ident)
             self.names().pop(ident, None)
             self.persist()
             self.refresh()
