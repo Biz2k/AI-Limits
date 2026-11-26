@@ -1,6 +1,12 @@
 # AI Limits
 
-**English** | [Русский](README.ru.md)
+🌐 **🇬🇧 English** | [🇷🇺 Русский](README.ru.md) | [🇺🇦 Українська](README.ua.md)
+
+[![Version](https://img.shields.io/badge/version-v1.6.1-2f7de1.svg)](https://github.com/Biz2k/AI-Limits/releases/tag/v1.6.1)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D6.svg)](https://github.com/Biz2k/AI-Limits)
+[![Python](https://img.shields.io/badge/Python-3.13-orange.svg)](https://www.python.org)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-10b981.svg)](src/limits_gui.pyw)
 
 A small Windows 11 desktop app for **one-click switching between multiple accounts** in **Claude Code**
 (Claude subscription), **Codex** (ChatGPT subscription) and **Google Antigravity** (Gemini models), while
@@ -16,7 +22,9 @@ window.
   <img src="docs/screenshot-settings.png" alt="Settings menu" width="340">
 </p>
 
-## Features
+---
+
+## ✨ Features
 
 **Accounts**
 - On the first start every account your apps are already signed in to shows up by itself: one card each for
@@ -90,7 +98,9 @@ window.
   <img src="docs/screenshot-alert.png" alt="Threshold warning" width="340">
 </p>
 
-## Installation
+---
+
+## ⚡ Installation
 
 A ready-made `AI.Limits.exe` is attached to each [release](https://github.com/Biz2k/AI-Limits/releases) — Python is
 not needed.
@@ -109,7 +119,9 @@ not needed.
      the app nor a key is found, a pop-up asks you to install the required app (Antigravity, Claude Code or Codex).
    - Claude Code and Codex cards (and added Claude and ChatGPT accounts) work without Google keys.
 
-## Console version
+---
+
+## 💻 Console version
 
 ```
 python src\limits.py                  show all limits
@@ -127,7 +139,9 @@ python src\limits.py keys                  enter Antigravity OAuth client id and
 
 Claude and ChatGPT accounts added in the window are shown by the console version too (`--json`: `profiles`).
 
-## Running from source and building the exe
+---
+
+## 🛠️ Running from source and building the exe
 
 **Requirements:**
 - Windows 11
@@ -163,7 +177,9 @@ next to it. The exe contains no keys and no tokens.
 
 To run the checks alone: `python tests\run_tests.py`.
 
-## Where data is stored
+---
+
+## 📁 Where data is stored
 
 Everything lives in `%APPDATA%\ai-limits\`:
 
@@ -185,7 +201,9 @@ Tokens, keys and the credential copies are encrypted with Windows DPAPI: only yo
 computer can decrypt them, so the folder is useless on another machine or for another user (add the accounts and
 keys again there). Programs running under your own account can still decrypt them.
 
-## How Antigravity account switching works
+---
+
+## 🔄 How Antigravity account switching works
 
 When you press "→ to Antigravity", the app gets a fresh access token for the chosen account, backs up the current Antigravity
 credentials, closes Antigravity, writes the token into Antigravity's entry in Windows Credential Manager
@@ -199,7 +217,9 @@ is no Antigravity server to check the account against in that case.
 
 This is not an official mechanism. It may stop working after Antigravity update, and you use it at your own risk.
 
-## Disclaimer
+---
+
+## ⚠️ Disclaimer
 
 - The app relies on undocumented endpoints of Anthropic, OpenAI and Google and on the OAuth clients of Claude
   Code, Codex and Antigravity (extra Claude and ChatGPT accounts are signed in by Claude Code and Codex themselves).
@@ -210,6 +230,8 @@ This is not an official mechanism. It may stop working after Antigravity update,
   accounts, with automatic backups beforehand).
 - No warranty of any kind; see the license.
 
-## License
+---
+
+## 📄 License
 
 [MIT](LICENSE)

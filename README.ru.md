@@ -1,6 +1,12 @@
 # AI Limits
 
-[English](README.md) | **Русский**
+🌐 [🇬🇧 English](README.md) | **🇷🇺 Русский** | [🇺🇦 Українська](README.ua.md)
+
+[![Version](https://img.shields.io/badge/version-v1.6.1-2f7de1.svg)](https://github.com/Biz2k/AI-Limits/releases/tag/v1.6.1)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D6.svg)](https://github.com/Biz2k/AI-Limits)
+[![Python](https://img.shields.io/badge/Python-3.13-orange.svg)](https://www.python.org)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-10b981.svg)](src/limits_gui.pyw)
 
 Небольшая программа для Windows 11 для **быстрого переключения между несколькими аккаунтами в один клик** в
 **Claude Code** (подписка Claude), **Codex** (подписка ChatGPT) и **Google Antigravity** (модели Gemini) с
@@ -15,7 +21,9 @@
   <img src="docs/screenshot-settings.png" alt="Меню настроек" width="340">
 </p>
 
-## Возможности
+---
+
+## ✨ Возможности
 
 **Аккаунты**
 - При первом запуске сами появляются все аккаунты, под которыми уже вошли ваши программы: по карточке для
@@ -92,7 +100,9 @@
   <img src="docs/screenshot-alert.png" alt="Предупреждение о пороге" width="340">
 </p>
 
-## Установка
+---
+
+## ⚡ Установка
 
 Готовый `AI.Limits.exe` приложен к каждому [выпуску](https://github.com/Biz2k/AI-Limits/releases) — Python для
 его запуска не нужен.
@@ -112,7 +122,9 @@
      или Codex).
    - Карточки Claude Code и Codex (и добавленные аккаунты Claude и ChatGPT) работают и без Google-ключей.
 
-## Консольная версия
+---
+
+## 💻 Консольная версия
 
 ```
 python src\limits.py                  показать все лимиты
@@ -130,7 +142,9 @@ python src\limits.py keys                  ввести id и secret OAuth-кл�
 
 Аккаунты Claude и ChatGPT, добавленные в окне, консольная версия тоже показывает (`--json`: `profiles`).
 
-## Запуск из исходников и сборка exe
+---
+
+## 🛠️ Запуск из исходников и сборка exe
 
 **Что нужно:**
 - Windows 11
@@ -166,7 +180,9 @@ SHA-256 в файле `AI Limits.exe.sha256`. В exe нет ни ключей, �
 
 Только проверки: `python tests\run_tests.py`.
 
-## Где хранятся данные
+---
+
+## 📁 Где хранятся данные
 
 Всё лежит в `%APPDATA%\ai-limits\`:
 
@@ -189,7 +205,9 @@ SHA-256 в файле `AI Limits.exe.sha256`. В exe нет ни ключей, �
 бесполезна (аккаунты и ключи там нужно добавить заново). Программы, запущенные под вашей учётной записью,
 расшифровать их по-прежнему могут.
 
-## Как работает смена аккаунта Antigravity
+---
+
+## 🔄 Как работает смена аккаунта Antigravity
 
 По кнопке «→ в Antigravity» программа получает свежий токен доступа выбранного аккаунта, сохраняет текущие учётные данные
 Antigravity, закрывает Antigravity, записывает токен в запись Antigravity в диспетчере учётных данных Windows (`gemini:antigravity`) и в
@@ -202,7 +220,9 @@ Antigravity, закрывает Antigravity, записывает токен в 
 
 Это не официальный механизм. Он может перестать работать после обновления Antigravity; пользуйтесь им на свой риск.
 
-## Оговорки
+---
+
+## ⚠️ Оговорки
 
 - Программа опирается на недокументированные адреса Anthropic, OpenAI и Google и на OAuth-клиенты Claude Code,
   Codex и Antigravity (дополнительные аккаунты Claude и ChatGPT входят через сами Claude Code и Codex). Они могут
@@ -213,6 +233,8 @@ Antigravity, закрывает Antigravity, записывает токен в 
   переключении аккаунтов, с автоматическим резервным копированием перед изменением).
 - Никаких гарантий; см. лицензию.
 
-## Лицензия
+---
+
+## 📄 Лицензия
 
 [MIT](LICENSE)
