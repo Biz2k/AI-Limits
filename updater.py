@@ -127,23 +127,27 @@ def download_and_verify(asset_url, expected_sha256=None, dest_path=None, on_prog
 
 
 def apply_exe_update(new_exe, target_exe=None):
-    """Запускает фоновый .cmd, который дожидается выхода текущего процесса, заменяет exe и запускает новый."""
+    """Запускает фоновый .cmd, который дожидается освобождения exe, заменяет его и запускает новый."""
     target = target_exe or (sys.executable if getattr(sys, "frozen", False) else None)
     if not target or not os.path.exists(new_exe):
         raise RuntimeError(T("Автообновление доступно только для собранного AI Limits.exe"))
     pid = os.getpid()
     bat = os.path.join(tempfile.gettempdir(), f"ai_limits_update_{pid}.cmd")
+    # Без пайпов (tasklist | find): в оконном процессе (--windowed) без stdin/stdout/stderr пайп в cmd.exe падает.
+    # Ждём 1 с и пробуем copy /Y в цикле, пока старый процесс и загрузчик PyInstaller не освободят exe.
     script = (
         "@echo off\r\n"
         "setlocal\r\n"
+        'set "_MEIPASS2="\r\n'
+        'set "_PYI_APPLICATION_HOME_DIR="\r\n'
+        'set "_PYI_ARCHIVE_FILE="\r\n'
+        'set "_PYI_PARENT_PROCESS_LEVEL="\r\n'
+        'set "TCL_LIBRARY="\r\n'
+        'set "TK_LIBRARY="\r\n'
         f'set "SRC={new_exe}"\r\n'
         f'set "DST={target}"\r\n'
-        "for /L %%i in (1,1,30) do (\r\n"
-        f'  tasklist /FI "PID eq {pid}" 2>nul | find "{pid}" >nul || goto :replace\r\n'
-        "  ping -n 2 127.0.0.1 >nul\r\n"
-        ")\r\n"
-        ":replace\r\n"
-        "for /L %%j in (1,1,15) do (\r\n"
+        "ping -n 2 127.0.0.1 >nul\r\n"
+        "for /L %%j in (1,1,30) do (\r\n"
         '  copy /Y "%SRC%" "%DST%" >nul 2>&1 && goto :ok\r\n'
         "  ping -n 2 127.0.0.1 >nul\r\n"
         ")\r\n"
@@ -156,6 +160,22 @@ def apply_exe_update(new_exe, target_exe=None):
     )
     with open(bat, "w", encoding="cp866", errors="replace", newline="") as f:
         f.write(script)
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
-    subprocess.Popen(["cmd.exe", "/c", bat], creationflags=flags, close_fds=True)
+    # Убираем переменные окружения PyInstaller (_MEIPASS2 и др.), иначе новый exe попытается
+    # загрузить python313.dll из уже удалённой временной папки _MEI* старого процесса.
+    env = {k: v for k, v in os.environ.items()
+           if not k.upper().startswith(("_MEIPASS", "_PYI_"))
+           and k.upper() not in ("TCL_LIBRARY", "TK_LIBRARY")}
+    if "PATH" in env:
+        mei = getattr(sys, "_MEIPASS", "")
+        if mei:
+            env["PATH"] = os.pathsep.join(
+                p for p in env["PATH"].split(os.pathsep) if os.path.normcase(p) != os.path.normcase(mei)
+            )
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    subprocess.Popen(
+        ["cmd.exe", "/c", bat],
+        env=env,
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        creationflags=flags, close_fds=True,
+    )
     return bat
