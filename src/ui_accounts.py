@@ -361,9 +361,9 @@ class AccountsMixin:
     def switch_mode(self, t, ide_running):
         """Метка или кнопка плитки: "current"/"switch" (IDE Antigravity), "current_codex"/"switch_codex" (Codex)."""
         if t["kind"] == "google":
-            # «● IDE» — только у аккаунта запущенной IDE со входом; IDE закрыта или открыта без входа — у аккаунта
-            # её записи входа обычная «→ в IDE» (1.5.4, владелец: серой «○ IDE» быть не должно)
-            if t["ide"] and ide_running and not getattr(self, "ide_nologin", False):
+            # «● Antigravity» — у текущего сохранённого аккаунта Antigravity (как у Claude Code и Codex),
+            # даже если Antigravity закрыта; скрывается только когда Antigravity открыта без входа (ide_nologin).
+            if t["ide"] and not getattr(self, "ide_nologin", False):
                 return "current"
             return "switch" if ide_running or L.ide_installed() else None
         suffix = {"chatgpt": "_codex", "claude": "_claude"}[t["kind"]]

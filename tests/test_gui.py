@@ -489,12 +489,12 @@ def main():
     yield wait(10, lambda: not app.loading and cb.ide_mode == "switch", "метка IDE осталась без записи входа")
     assert "antigravity" not in app.cards
     STATE["ide_account"] = "b@example.com"
-    # IDE закрыта: тоже «→ в IDE» (нажатие запустит IDE этим аккаунтом)
+    # Antigravity закрыта: у сохранённого аккаунта сразу «● Antigravity» (как у Claude Code и Codex)
     L.local_ide_info = lambda: {"running": False, "window": False, "email": None, "accounts": {}}
     app.refresh()
     yield wait(10, lambda: not app.loading and app.tile_info["b@example.com"]["ide"], "нет записи входа IDE")
     yield wait()
-    assert cb.ide_mode == "switch" and cb.ide.cget("text") == "→ в Antigravity", (cb.ide_mode, cb.ide.cget("text"))
+    assert cb.ide_mode == "current" and cb.ide.cget("text") == "● Antigravity" and not cb.quiet, (cb.ide_mode, cb.ide.cget("text"))
     assert "○" not in " ".join(texts(app.body))                         # серой «○ IDE» нет (владелец)
     L.local_ide_info = fake_ide_info
     app.refresh()

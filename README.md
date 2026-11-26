@@ -2,7 +2,7 @@
 
 🌐 **🇬🇧 English** | [🇷🇺 Русский](README.ru.md) | [🇺🇦 Українська](README.ua.md)
 
-[![Version](https://img.shields.io/badge/version-v1.6.1-2f7de1.svg)](https://github.com/Biz2k/AI-Limits/releases/tag/v1.6.1)
+[![Version](https://img.shields.io/badge/version-v1.6.2-2f7de1.svg)](https://github.com/Biz2k/AI-Limits/releases/tag/v1.6.2)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-0078D6.svg)](https://github.com/Biz2k/AI-Limits)
 [![Python](https://img.shields.io/badge/Python-3.13-orange.svg)](https://www.python.org)
