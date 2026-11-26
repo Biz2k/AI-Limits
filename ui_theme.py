@@ -148,8 +148,8 @@ class ThinScrollbar(tk.Canvas):
     THUMB, THUMB_HI = "#3a4150", "#566074"
     MIN_THUMB = 24
 
-    def __init__(self, master, target, x=-7):
-        super().__init__(master, width=self.W, bg=BG, highlightthickness=0, cursor="arrow")
+    def __init__(self, master, target, x=-7, bg=BG):
+        super().__init__(master, width=self.W, bg=bg, highlightthickness=0, cursor="arrow")
         self.target, self.x = target, x
         self.first, self.last = 0.0, 1.0
         self.hover = self.drag = False

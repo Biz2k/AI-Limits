@@ -66,7 +66,7 @@ window.
 **Window**
 - Cards can be collapsed (a collapsed card shows how much of its weekly limit is left), reordered by dragging the
   colored strip on their left (the other cards slide aside), and laid out in two columns (⚙ → Cards in two columns).
-- Remembers window size and position; shows a thin scrollbar in the app's style when the cards do not fit.
+- Remembers window size and position; shows a thin scrollbar in the app's style when the cards or the ⚙ settings menu do not fit on screen.
 - Auto refresh (1 / 5 / 15 min), always-on-top. Cards and the ⚙ settings menu update in place without flicker.
 - Tray icon with a mini window on hover (same card order), a dark context menu, minimize/close to tray, start with
   Windows. Clicking the icon brings the window to the front, or hides it to the tray if it is already in focus.

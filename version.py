@@ -5,7 +5,7 @@
 """
 import sys
 
-__version__ = "1.5.7"
+__version__ = "1.5.8"
 
 
 def pyinstaller_version_info():

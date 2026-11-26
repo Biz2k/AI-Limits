@@ -590,7 +590,7 @@ def main():
     assert int(cl.outer.grid_info()["row"]) == 1
     app._show_menu(False)
     yield wait()
-    item = next(w for w in app.menu_win.winfo_children()[0].winfo_children()
+    item = next(w for w in app._menu["box"].winfo_children()
                 if "Карточки в две колонки" in texts(w))
     item.winfo_children()[-1].event_generate("<Button-1>")              # галочка в меню — как щелчком
     yield wait(0.5)
@@ -787,7 +787,7 @@ def main():
     yield wait()
 
     def menu_item(name):
-        return next(w for w in app.menu_win.winfo_children()[0].winfo_children() if name in texts(w))
+        return next(w for w in app._menu["box"].winfo_children() if name in texts(w))
     assert "Работа" not in texts(app.menu_win)                           # открывается свёрнутым
     win = app.menu_win
     menu_item("Добавить аккаунт").winfo_children()[-1].event_generate("<Button-1>")
@@ -837,6 +837,30 @@ def main():
     yield wait(0.4)
     assert "Работа" not in texts(app.menu_win) and "Добавить аккаунт" in texts(app.menu_win)
     assert app.menu_win is win                                          # всё — в том же окне меню
+    # вертикальная прокрутка меню настроек при выходе за нижнюю границу экрана (выше панели задач)
+    sb_m = app._menu["sb"]
+    cv_m = app._menu["cv"]
+    assert not sb_m.shown and not sb_m.winfo_ismapped()
+    orig_wa = app._work_area
+    by_m = app.menu_btn.winfo_rooty() + app.menu_btn.winfo_height() + 4
+    app._work_area = lambda x, y: (0, 0, 1920, by_m + 240)              # экран ниже кнопки ⚙ короче меню
+    app._menu_place()
+    yield wait(0.3)
+    assert sb_m.shown and sb_m.winfo_ismapped() and sb_m.winfo_width() <= 8, (sb_m.shown, sb_m.winfo_width())
+    assert app.menu_win.winfo_height() <= 240, app.menu_win.winfo_height()
+    assert abs((sb_m.winfo_rootx() + sb_m.winfo_width()) - (app.menu_win.winfo_rootx() + app.menu_win.winfo_width())) <= 6
+    main_y0 = app.cv.yview()[0]
+    app._wheel(E(widget=app._menu["box"], delta=-120))                  # колесо над меню крутит меню, не главное окно
+    yield wait(0.1)
+    assert cv_m.yview()[0] > 0 and app.cv.yview()[0] == main_y0, (cv_m.yview(), app.cv.yview())
+    sb_m.event_generate("<ButtonPress-1>", x=3, y=1)                    # щелчок по дорожке сверху — возврат вверх
+    sb_m.event_generate("<ButtonRelease-1>", x=3, y=1)
+    yield wait(0.1)
+    assert cv_m.yview()[0] == 0, cv_m.yview()
+    app._work_area = orig_wa
+    app._menu_place()
+    yield wait(0.2)
+    assert not sb_m.shown and not sb_m.winfo_ismapped()
     app.close_menu()
     step("«Управление аккаунтами» — раскрывающийся пункт меню ⚙, группы по сервисам, имя и email мелко;"
          " сервисы в «Добавить аккаунт» — их цветами")

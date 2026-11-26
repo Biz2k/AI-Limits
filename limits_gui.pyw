@@ -222,6 +222,13 @@ class App(PopupsMixin, TrayMixin, HistoryMixin, LayoutMixin, AccountsMixin):
         self.cv.configure(scrollregion=self.cv.bbox("all"))
 
     def _wheel(self, e):
+        mw = getattr(self, "menu_win", None)
+        if mw and mw.winfo_exists() and str(e.widget).startswith(str(mw)):
+            m = getattr(self, "_menu", None)
+            if m and m["box"].winfo_reqheight() > m["cv"].winfo_height():
+                step = (-1 if e.delta > 0 else 1) * max(1, abs(e.delta) // 40)
+                m["cv"].yview_scroll(step, "units")
+            return
         if self.body.winfo_reqheight() > self.cv.winfo_height():
             self.cv.yview_scroll(int(-e.delta / 120) * 2, "units")
 

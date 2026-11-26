@@ -12,7 +12,7 @@ from i18n import T
 from ui_theme import fade_in
 from ui_theme import (
     CARD, CARD_HI, CLAUDE, CODEX, FAINT, FG, FONT, FONT_D, FlatButton, BLUE, GOOGLE, GREEN, INTERVALS, LINE, MUTED,
-    RED, YELLOW,
+    RED, ThinScrollbar, YELLOW,
     color_for)
 from autostart import autostart_enabled, set_autostart
 from ui_cards import _set
@@ -185,10 +185,16 @@ class PopupsMixin:
         p.overrideredirect(True)
         p.attributes("-topmost", True)
         p.configure(bg=LINE)
-        box = tk.Frame(p, bg=CARD, padx=6, pady=6)
-        box.pack(padx=1, pady=1)
+        wrap = tk.Frame(p, bg=CARD)
+        wrap.pack(fill="both", expand=True, padx=1, pady=1)
+        cv = tk.Canvas(wrap, bg=CARD, highlightthickness=0, yscrollincrement=16)
+        box = tk.Frame(cv, bg=CARD, padx=6, pady=6)
+        box_id = cv.create_window((0, 0), window=box, anchor="nw")
+        cv.pack(fill="both", expand=True)
+        sb = ThinScrollbar(wrap, cv, x=-2, bg=CARD)
+        cv.configure(yscrollcommand=sb.set)
         self.menu_win = p
-        m = self._menu = {"tr": [], "sync": [], "sections": {}}
+        m = self._menu = {"tr": [], "sync": [], "sections": {}, "cv": cv, "box": box, "box_id": box_id, "sb": sb}
 
         def tr(w, text):  # надпись, которая меняется при смене языка: запоминаем русский исходник
             w._ru = text
@@ -346,6 +352,7 @@ class PopupsMixin:
 
         for f in m["sync"]:
             f()
+        box.bind("<Configure>", lambda _e: self._menu_place())
         self._menu_place()
         # закрыть по Esc и по щелчку вне меню
         p.bind("<Escape>", self.close_menu)
@@ -378,15 +385,41 @@ class PopupsMixin:
         self._menu_place()
 
     def _menu_place(self):
-        """Меню под кнопкой ⚙; правый край — не дальше правого края кнопки «Обновить» (поле содержимого окна)."""
-        p = getattr(self, "menu_win", None)
-        if not p or not p.winfo_exists():
+        """Меню под кнопкой ⚙; правый край — не дальше правого края кнопки «Обновить» (поле содержимого окна).
+        Если меню уходит ниже рабочей области экрана (выше панели задач), высота ограничивается и включается
+        вертикальная прокрутка с тонкой полосой на правой грани."""
+        p, m = getattr(self, "menu_win", None), getattr(self, "_menu", None)
+        if not p or not m or not p.winfo_exists():
             return
+        cv, box, box_id = m["cv"], m["box"], m["box_id"]
         p.update_idletasks()
+        req_w, req_h = box.winfo_reqwidth(), box.winfo_reqheight()
         bx = self.menu_btn.winfo_rootx()
         by = self.menu_btn.winfo_rooty() + self.menu_btn.winfo_height() + 4
+        left, top, _work_right, bottom = self._work_area(bx, by)
+        avail_h = bottom - by - 8
+        if req_h <= avail_h:
+            vis_h, y = req_h, by
+        elif avail_h >= 120:
+            vis_h, y = avail_h, by
+        else:
+            vis_h = min(req_h, max(120, bottom - top - 16))
+            y = max(top + 8, bottom - vis_h - 8)
+        state = (req_w, vis_h, req_h)
+        if m.get("_size") != state:
+            m["_size"] = state
+            cv.configure(width=req_w, height=vis_h, scrollregion=(0, 0, req_w, req_h))
+            cv.itemconfig(box_id, width=req_w)
+            if req_h <= vis_h:
+                cv.yview_moveto(0)
+            else:
+                first, last = cv.yview()
+                max_first = max(0.0, 1.0 - vis_h / req_h)
+                if first > max_first:
+                    cv.yview_moveto(max_first)
         right = self.refresh_btn.winfo_rootx() + self.refresh_btn.winfo_width()
-        geo = f"+{min(bx, right - p.winfo_reqwidth())}+{by}"
+        x = max(left + 8, min(bx, right - (req_w + 2)))
+        geo = f"{req_w + 2}x{vis_h + 2}+{x}+{y}"
         if getattr(p, "_geo", None) != geo:
             p._geo = geo
             p.geometry(geo)
